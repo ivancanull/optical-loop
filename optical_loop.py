@@ -50,6 +50,20 @@ def _parse_networks(value: str) -> Sequence[str]:
     return tuple(part.strip() for part in value.split(",") if part.strip())
 
 
+def _repo_root() -> Path:
+    return Path(__file__).resolve().parent
+
+
+def _ensure_path_within_repo(path: Path, *, label: str) -> Path:
+    repo_root = _repo_root().resolve()
+    resolved = Path(path).resolve()
+    if resolved != repo_root and repo_root not in resolved.parents:
+        raise SystemExit(
+            f"{label} must stay inside the OpticalLoop repository: {path.as_posix()}"
+        )
+    return path
+
+
 def _source_has_artifacts(path: Path) -> bool:
     return all(
         (path / source_relative_path).exists() or (path / output_name).exists()
@@ -61,7 +75,6 @@ def _default_artifact_source_results_dir() -> Path:
     for candidate in (
         Path("results"),
         Path("examples/rosa/results"),
-        Path("../results"),
     ):
         if _source_has_artifacts(candidate):
             return candidate
@@ -180,6 +193,10 @@ def _run_rosa(args) -> None:
         source_results_dir = (
             args.artifact_source_results_dir or _default_artifact_source_results_dir()
         )
+        source_results_dir = _ensure_path_within_repo(
+            source_results_dir,
+            label="--artifact-source-results-dir",
+        )
         outputs = write_reference_artifacts(
             source_results_dir=source_results_dir,
             output_results_dir=args.artifact_results_dir,
@@ -282,8 +299,8 @@ def _add_rosa_parser(subparsers) -> None:
         type=Path,
         default=None,
         help=(
-            "Source Timeloop/CiMLoop result tree for lightweight artifacts. "
-            "Defaults to results, examples/rosa/results, then ../results."
+            "In-repo source Timeloop result tree for lightweight artifacts. "
+            "Defaults to results, then examples/rosa/results."
         ),
     )
     parser.add_argument(

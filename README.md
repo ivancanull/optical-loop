@@ -2,7 +2,7 @@
 
 OpticalLoop is a Timeloop-backed simulator framework for optical accelerator studies. It provides a small Python core for describing optical macro configurations, running Timeloop mapper jobs, normalizing results, writing reusable CSV artifacts, and building application workflows on top of those primitives. Live simulation is Timeloop-only: OpticalLoop does not introduce a local analytic energy, latency, cycle, or area simulator.
 
-The first application in this repository is **ROSA**, a paper artifact for microring-resonator optical neural networks (MRR-ONNs) with optical shift-and-add (OSA) and layer-wise hybrid mapping. ROSA is now an application preset under `applications/rosa/`; it is not the boundary of the simulator itself.
+The first application in this repository is **ROSA**, an included example for microring-resonator optical neural networks (MRR-ONNs) with optical shift-and-add (OSA) and layer-wise hybrid mapping. ROSA lives under `applications/rosa/`; it is not the boundary of the simulator itself.
 
 ## Quick Start
 
@@ -12,7 +12,7 @@ Run the committed ROSA application report:
 conda run -n timeloop python optical_loop.py rosa --stage report
 ```
 
-Validate the committed ROSA reference artifacts:
+Validate the committed ROSA example artifacts:
 
 ```bash
 conda run -n timeloop python optical_loop.py rosa --stage validate
@@ -56,14 +56,14 @@ The public core API exports `TimeloopBackend`, `TimeloopRun`, `SimulationResult`
 | --- | --- | --- |
 | ROSA | `applications/rosa/` | MRR-ONN architecture sweeps, no-OSA vs OSA comparison, six-network OSA ranking, hybrid mapping workflow, validation, and plots. |
 
-ROSA lightweight artifacts live under `examples/rosa/results/` and `examples/rosa/plots/`. The committed ROSA checks currently reproduce:
+ROSA lightweight artifacts live under `examples/rosa/results/` and `examples/rosa/plots/`. The committed ROSA checks currently validate:
 
 | Check | Expected result |
 | --- | --- |
 | AlexNet OSA best EDP | `T1,P1,C100,R12`, EDP `0.0810225695` |
 | Six-network OSA ranking winner | `T1, P32, C8, R4`, score `0.8529673580` |
 
-The ROSA paper also includes PyTorch behavioral experiments for DAC/thermal noise, 8-bit quantized accuracy, and CIFAR-10 robustness. Those algorithm-level experiments are paper context; this repository's live simulation path remains Timeloop-backed architecture evaluation.
+The original ROSA study also included PyTorch behavioral experiments for DAC/thermal noise, 8-bit quantized accuracy, and CIFAR-10 robustness. Those algorithm-level experiments are not part of this repository's live simulation path, which remains Timeloop-backed architecture evaluation.
 
 ## Common Commands
 
@@ -74,7 +74,7 @@ conda run -n timeloop python optical_loop.py rosa --stage report
 conda run -n timeloop python optical_loop.py rosa --stage validate
 ```
 
-Regenerate ROSA lightweight examples from an existing full result tree:
+Regenerate ROSA lightweight examples from an in-repo full result tree:
 
 ```bash
 conda run -n timeloop python optical_loop.py rosa --stage artifacts
@@ -96,5 +96,5 @@ conda run -n timeloop python optical_loop.py rosa --mode rerun --stage hybrid --
 
 - `docs/simulator_overview.md`: simulator architecture, API boundaries, and Timeloop-only correctness model.
 - `docs/cli_and_api.md`: command-line and Python API usage.
-- `docs/rosa_application.md`: ROSA application reproduction and validation.
+- `docs/rosa_application.md`: ROSA application workflow and validation.
 - `docs/results_and_artifacts.md`: result files, validation formulas, artifact layout, and glossary.

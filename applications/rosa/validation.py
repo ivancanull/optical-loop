@@ -353,7 +353,7 @@ def write_reference_artifacts(
     output_plots_dir: Path = Path("examples/rosa/plots"),
     validation_report_name: str = "validation_report.csv",
 ) -> Mapping[str, Path]:
-    """Copy lightweight gold CSVs, validate them, and generate plots."""
+    """Copy lightweight in-repo CSV artifacts, validate them, and generate plots."""
 
     source_results_dir = Path(source_results_dir)
     output_results_dir = Path(output_results_dir)

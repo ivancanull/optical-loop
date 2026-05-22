@@ -1,5 +1,7 @@
 from argparse import Namespace
+from pathlib import Path
 
+import pytest
 import optical_loop
 from opticalloop.result import SimulationResult
 
@@ -49,3 +51,11 @@ def test_layer_command_uses_layer_simulator(monkeypatch, capsys) -> None:
     assert captured["layer"].layer_path == "alexnet/0"
     assert captured["architecture"].architecture_key == "T1, P1, C100, R12"
     assert captured["architecture"].macro == "proposed_mrr_optical_shift_add"
+
+
+def test_artifact_source_must_stay_inside_repo() -> None:
+    with pytest.raises(SystemExit, match="must stay inside"):
+        optical_loop._ensure_path_within_repo(
+            Path("..") / "results",
+            label="--artifact-source-results-dir",
+        )

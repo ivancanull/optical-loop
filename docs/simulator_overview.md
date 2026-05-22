@@ -26,7 +26,7 @@ The core code does not estimate energy, latency, cycles, area, or component brea
 
 ## Applications
 
-Applications live under `applications/`. They can define presets, workflow stages, validation rules, plots, and committed examples while reusing the simulator core. ROSA is the first application and demonstrates a complete paper-artifact workflow.
+Applications live under `applications/`. They can define presets, workflow stages, validation rules, plots, and committed examples while reusing the simulator core. ROSA is the first included application workflow.
 
 ## Workspace
 

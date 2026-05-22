@@ -1,12 +1,12 @@
 # ROSA Application
 
-ROSA is the first OpticalLoop application preset. It reproduces the architecture-level workflow for **ROSA: Robust and Energy-Efficient Microring-Based Optical Neural Networks via Optical Shift-and-Add and Layer-Wise Hybrid Mapping**.
+ROSA is the first OpticalLoop application preset. It provides an included architecture-level workflow for microring-resonator optical neural networks with optical shift-and-add and layer-wise hybrid mapping.
 
-The application covers MRR-ONN architecture sweeps, no-OSA versus OSA comparison, six-network OSA ranking, and layer-wise hybrid mapping support. It does not rerun the paper's separate PyTorch DAC/thermal noise and CIFAR-10 accuracy simulations.
+The application covers MRR-ONN architecture sweeps, no-OSA versus OSA comparison, six-network OSA ranking, and layer-wise hybrid mapping support. It does not include separate PyTorch DAC/thermal noise or CIFAR-10 accuracy simulations.
 
-## What ROSA Reproduces Here
+## What ROSA Runs Here
 
-| Paper-facing result area | Artifact support |
+| Result area | Artifact support |
 | --- | --- |
 | Optimized MRR OPE sizing across CNN and Transformer workloads | Default ten-architecture sweep and six-network ranking over `alexnet`, `vgg16`, `resnet18`, `mobilenet_v3`, `gpt2_medium`, and `vision_transformer`. |
 | No-OSA vs OSA architecture comparison | AlexNet aggregate CSVs and `examples/rosa/plots/alexnet_osa_edp_comparison.png`. |
@@ -48,6 +48,6 @@ conda run -n timeloop python optical_loop.py rosa --mode rerun --stage hybrid --
 
 The `both` family runs the OSA hybrid macros and the legacy delay-line hybrid macros when mapping files exist for the selected networks.
 
-## Paper Context
+## Self-Contained Data Boundary
 
-The ROSA paper reports that optimized MRR array sizing reduces aggregated relative EDP by about 64% versus a DEAP-CNNs setting and 26% versus a compact baseline. It also reports OSA EDP reduction and hybrid-mapping robustness gains. Those claims provide context for this application, while executable validation in this repository checks the committed Timeloop-backed architecture artifacts.
+ROSA validation reads only committed files under `examples/rosa/results/` or generated files under the in-repo `results/` directory. Full reruns call Timeloop through the vendored `workspace/` files in this repository.

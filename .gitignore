@@ -8,6 +8,7 @@ __pycache__/
 
 workspace/outputs/
 results/
+paper/
 !examples/rosa/
 !examples/rosa/results/
 !examples/rosa/results/*.csv
