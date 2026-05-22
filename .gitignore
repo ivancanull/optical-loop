@@ -9,11 +9,14 @@ __pycache__/
 workspace/outputs/
 results/
 paper/
+reference/
 !examples/rosa/
 !examples/rosa/results/
 !examples/rosa/results/*.csv
 !examples/rosa/plots/
 !examples/rosa/plots/*.png
+!examples/deap_cnns/
+!examples/deap_cnns/*.csv
 temp/
 
 timeloop-mapper.*

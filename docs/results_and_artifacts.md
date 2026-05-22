@@ -26,6 +26,14 @@ Application workflows can use `workflow/results.py` to write:
 | `examples/rosa/plots/alexnet_osa_edp_comparison.png` | AlexNet no-OSA vs OSA EDP comparison. |
 | `examples/rosa/plots/six_network_osa_ranking.png` | Six-network OSA aggregate score ranking. |
 
+## Committed DEAP-CNNs Artifacts
+
+| File | Meaning |
+| --- | --- |
+| `examples/deap_cnns/device_parameters_deap_cnns.csv` | Device constants extracted from the DEAP-CNNs article and used by the application. |
+| `examples/deap_cnns/architecture_summary_deap_cnns.csv` | Supported DEAP-CNNs architecture presets and derived wavelength/modulator counts. |
+| `examples/deap_cnns/validation_report.csv` | Validation report for device constants, architecture constraints, tracked-reference checks, and path portability. |
+
 ## ROSA Validation Formula
 
 For each network and architecture:

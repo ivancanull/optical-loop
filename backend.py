@@ -1,5 +1,7 @@
 """Timeloop backend adapter for OpticalLoop."""
 
+import os
+import shutil
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -98,6 +100,7 @@ class TimeloopBackend:
         return self._load_utils_module().quick_run
 
     def _load_utils_module(self):
+        self._prepare_timeloop_shared_libraries()
         scripts_dir = self.scripts_dir or self._default_scripts_dir()
         scripts_dir = Path(scripts_dir)
         if str(scripts_dir) not in sys.path:
@@ -105,6 +108,20 @@ class TimeloopBackend:
         import utils
 
         return utils
+
+    @staticmethod
+    def _prepare_timeloop_shared_libraries() -> None:
+        mapper = shutil.which("timeloop-mapper")
+        if mapper is None:
+            return
+        lib_dir = Path(mapper).resolve().parents[1] / "lib"
+        if not (lib_dir / "libtimeloop-mapper.so").exists():
+            return
+        current = os.environ.get("LD_LIBRARY_PATH", "")
+        paths = [path for path in current.split(os.pathsep) if path]
+        lib_dir_text = str(lib_dir)
+        if lib_dir_text not in paths:
+            os.environ["LD_LIBRARY_PATH"] = os.pathsep.join([lib_dir_text, *paths])
 
     @staticmethod
     def _default_scripts_dir() -> Path:

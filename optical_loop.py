@@ -37,6 +37,12 @@ from opticalloop import (  # noqa: E402
     TimeloopLayerRef,
     TimeloopResultCache,
 )
+from opticalloop.applications.deap_cnns import (  # noqa: E402
+    DEAP_ARCHITECTURES,
+    DeapResultValidator,
+    default_deap_workflow,
+    write_deap_artifacts,
+)
 from opticalloop.applications.rosa import (  # noqa: E402
     FINAL_ARTIFACTS,
     RosaResultValidator,
@@ -149,6 +155,65 @@ def _write_validation_report(results_dir: Path, report_path: Path) -> None:
             f"{report_path.as_posix()} for {len(failed)} failing checks"
         )
     print(f"Validation passed ({len(report)} checks); wrote {report_path.as_posix()}")
+
+
+def _print_deap_report(report) -> None:
+    print("OpticalLoop DEAP-CNNs report")
+    print(
+        "Architecture: "
+        f"{report['name']} {report['architecture']} "
+        f"kernel={report['kernel_edge']}x{report['kernel_edge']} "
+        f"channels={report['input_channels']}"
+    )
+    print(
+        "Device: "
+        f"{report['device_precision_bits']}-bit MRR control, "
+        f"{report['output_cycle_ps']} ps output cycle"
+    )
+
+
+def _write_deap_validation_report(artifact_dir: Path, report_path: Path) -> None:
+    validator = DeapResultValidator(artifact_dir)
+    report = validator.validate()
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report.to_csv(report_path, index=False)
+    failed = report[~report["passed"]]
+    if not failed.empty:
+        raise SystemExit(
+            "Validation failed; see "
+            f"{report_path.as_posix()} for {len(failed)} failing checks"
+        )
+    print(f"Validation passed ({len(report)} checks); wrote {report_path.as_posix()}")
+
+
+def _run_deap(args) -> None:
+    workflow = default_deap_workflow(
+        architecture_name=args.architecture,
+        results_dir=args.results_dir,
+        n_jobs=args.n_jobs,
+    )
+
+    if args.mode == "cache" and args.stage == "run":
+        raise SystemExit("cache mode cannot run live Timeloop stages; use --mode rerun")
+
+    if args.stage in {"run", "all"} and args.mode == "rerun":
+        workflow.run_sweeps()
+
+    if args.stage in {"aggregate", "all"}:
+        workflow.reconstruct_and_aggregate()
+
+    if args.stage in {"artifacts", "all"}:
+        outputs = write_deap_artifacts(args.artifact_dir)
+        print(f"Wrote DEAP-CNNs artifacts: {len(outputs)} files")
+
+    if args.stage in {"validate", "all"}:
+        report_path = args.validation_report or (
+            args.artifact_dir / "validation_report.csv"
+        )
+        _write_deap_validation_report(args.artifact_dir, report_path)
+
+    if args.stage in {"report", "all"}:
+        _print_deap_report(workflow.report())
 
 
 def _run_rosa(args) -> None:
@@ -324,6 +389,34 @@ def _add_rosa_parser(subparsers) -> None:
     parser.set_defaults(func=_run_rosa)
 
 
+def _add_deap_parser(subparsers) -> None:
+    parser = subparsers.add_parser(
+        "deap-cnns",
+        help="Run the DEAP-CNNs application workflow.",
+    )
+    parser.add_argument("--mode", choices=("cache", "rerun"), default="cache")
+    parser.add_argument(
+        "--stage",
+        choices=("report", "run", "aggregate", "validate", "artifacts", "all"),
+        default="report",
+    )
+    parser.add_argument(
+        "--architecture",
+        choices=tuple(DEAP_ARCHITECTURES.keys()),
+        default="mnist-default",
+    )
+    parser.add_argument("--results-dir", type=Path, default=Path("results"))
+    parser.add_argument("--artifact-dir", type=Path, default=Path("examples/deap_cnns"))
+    parser.add_argument("--n-jobs", type=int, default=1)
+    parser.add_argument(
+        "--validation-report",
+        type=Path,
+        default=None,
+        help="Validation report path. Defaults to <artifact-dir>/validation_report.csv.",
+    )
+    parser.set_defaults(func=_run_deap)
+
+
 def _add_layer_parser(subparsers) -> None:
     parser = subparsers.add_parser(
         "layer",
@@ -352,6 +445,7 @@ def main() -> None:
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
     _add_layer_parser(subparsers)
+    _add_deap_parser(subparsers)
     _add_rosa_parser(subparsers)
     args = parser.parse_args()
     args.func(args)

@@ -51,6 +51,19 @@ Run only hybrid mappings:
 conda run -n timeloop python optical_loop.py rosa --mode rerun --stage hybrid --hybrid-family both
 ```
 
+DEAP-CNNs report and validation:
+
+```bash
+conda run -n timeloop python optical_loop.py deap-cnns --stage report
+conda run -n timeloop python optical_loop.py deap-cnns --stage validate
+```
+
+DEAP-CNNs live Timeloop rerun:
+
+```bash
+conda run -n timeloop python optical_loop.py deap-cnns --mode rerun --stage all --architecture mnist-default
+```
+
 ## Python API
 
 Core usage:

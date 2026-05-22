@@ -1,0 +1,74 @@
+# These variables pertain to the workload, microarch, and circuits. They should
+# be matched between architectures when comparing for a fair comparison.
+# Furthermore, this file should follow the same format for all architectures
+# such that we can mix and match architectures with different iso files.
+variables:
+  version: 0.4
+  # ===========================================================================
+  # Workload, microarch, circuits. Things that should be matched
+  # between architectures when comparing.
+  # ===========================================================================
+  ## Workload -----------------------------------------------------------------
+  WEIGHT_BITS: 7
+  INPUT_BITS:  7
+  OUTPUT_BITS: 7
+  BATCH_SIZE:  64
+
+  # Set by CiM processor if these values are available in the workload.
+  # Otherwise, use the defaults here.
+  INPUTS_HIST: ([1] * 15) # Uniform distribution
+  WEIGHTS_HIST: ([1] * 15) # Uniform distribution
+  OUTPUTS_HIST: INPUTS_HIST
+
+  ## Microarch ----------------------------------------------------------------
+  SUPPORTED_INPUT_BITS:  8       # Maximum input bits supported by the arch.
+  SUPPORTED_WEIGHT_BITS: 8       # Maximum weight bits supported by the arch.
+  SUPPORTED_OUTPUT_BITS: 8       # Maximum output bits supported by the arch.
+
+  # Circuits ------------------------------------------------------------------
+  VOLTAGE: 1
+  TECHNOLOGY: 45 # nm
+  CELL_CONFIG: None
+  VOLTAGE_ENERGY_SCALE: (VOLTAGE / 1) ** 2
+  VOLTAGE_LATENCY_SCALE: 1 / VOLTAGE
+
+  # Calibration ---------------------------------------------------------------
+  SCALING: "deapcnns"
+  scaling: SCALING # The lower-case version is propagated to some plug-ins.
+
+  # Some pretty big scaling factors here because the Albireo paper uses a 28nm
+  # ADC without scaling it to 7nm like the rest of the components, so the ADC is
+  # much higher area and energy than it would be in a 7nm process.
+  # Scale the existing Timeloop/Accelergy ADC estimator to the DEAP-CNNs
+  # 76 mW ADC at the 200 ps output cycle: 0.076 W / 0.52136 W.
+  ADC_ENERGY_SCALE: 0.14577259475218657
+  ADC_AREA_SCALE: 1
+  ROW_COL_DRIVERS_AREA_SCALE: 1
+
+  # DEAP-CNNs device parameters extracted from Bangari et al. The live
+  # simulation path still goes through Timeloop/Accelergy; these variables keep
+  # the paper constants close to the architecture instance for provenance.
+  DEAP_MRR_PRECISION_BITS: 7
+  DEAP_MRR_SELF_COUPLING: 0.99
+  DEAP_MRR_LOSS: 0.99
+  DEAP_MAX_WAVELENGTHS: 100
+  DEAP_MAX_MODULATORS: 1024
+  DEAP_WAVEGUIDE_WIDTH_NM: 500
+  DEAP_WAVEGUIDE_THICKNESS_NM: 220
+  DEAP_WAVEGUIDE_BEND_RADIUS_UM: 5
+  DEAP_WAVELENGTH_MIN_UM: 1.5
+  DEAP_WAVELENGTH_MAX_UM: 1.6
+  DEAP_PROPAGATION_RADIUS_UM: 10
+  DEAP_PROPAGATION_MRRS: 100
+  DEAP_PROPAGATION_TIME_PS: 21
+  DEAP_BALANCED_PD_THROUGHPUT_GSPS: 25
+  DEAP_TIA_THROUGHPUT_GSPS: 10
+  DEAP_MRR_MODULATION_THROUGHPUT_GSPS: 128
+  DEAP_DAC_THROUGHPUT_GSPS: 5
+  DEAP_ADC_THROUGHPUT_GSPS: 5
+  DEAP_OUTPUT_CYCLE_PS: 200
+  DEAP_LASER_POWER_MW: 100
+  DEAP_MRR_POWER_MW: 19.5
+  DEAP_DAC_POWER_MW: 26
+  DEAP_TIA_POWER_MW: 17
+  DEAP_ADC_POWER_MW: 76

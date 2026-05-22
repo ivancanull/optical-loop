@@ -2,7 +2,7 @@
 
 OpticalLoop is a Timeloop-backed simulator framework for optical accelerator studies. It provides a small Python core for describing optical macro configurations, running Timeloop mapper jobs, normalizing results, writing reusable CSV artifacts, and building application workflows on top of those primitives. Live simulation is Timeloop-only: OpticalLoop does not introduce a local analytic energy, latency, cycle, or area simulator.
 
-The first application in this repository is **ROSA**, an included example for microring-resonator optical neural networks (MRR-ONNs) with optical shift-and-add (OSA) and layer-wise hybrid mapping. ROSA lives under `applications/rosa/`; it is not the boundary of the simulator itself.
+The included applications currently cover **ROSA** and **DEAP-CNNs**. They live under `applications/` as examples built on the same simulator core; neither application is the boundary of OpticalLoop itself.
 
 ## Quick Start
 
@@ -16,6 +16,12 @@ Validate the committed ROSA example artifacts:
 
 ```bash
 conda run -n timeloop python optical_loop.py rosa --stage validate
+```
+
+Inspect the DEAP-CNNs application:
+
+```bash
+conda run -n timeloop python optical_loop.py deap-cnns --stage report
 ```
 
 Run one generic Timeloop-backed layer simulation:
@@ -55,6 +61,7 @@ The public core API exports `TimeloopBackend`, `TimeloopRun`, `SimulationResult`
 | Application | Location | What it provides |
 | --- | --- | --- |
 | ROSA | `applications/rosa/` | MRR-ONN architecture sweeps, no-OSA vs OSA comparison, six-network OSA ranking, hybrid mapping workflow, validation, and plots. |
+| DEAP-CNNs | `applications/deap_cnns/` | Timeloop-backed convolutional-unit architecture model derived from DEAP-CNNs device and workload parameters. |
 
 ROSA lightweight artifacts live under `examples/rosa/results/` and `examples/rosa/plots/`. The committed ROSA checks currently validate:
 
@@ -92,9 +99,18 @@ Run only the ROSA hybrid mapping workflow:
 conda run -n timeloop python optical_loop.py rosa --mode rerun --stage hybrid --hybrid-family both
 ```
 
+DEAP-CNNs report, validation, and live rerun:
+
+```bash
+conda run -n timeloop python optical_loop.py deap-cnns --stage report
+conda run -n timeloop python optical_loop.py deap-cnns --stage validate
+conda run -n timeloop python optical_loop.py deap-cnns --mode rerun --stage all
+```
+
 ## Documentation
 
 - `docs/simulator_overview.md`: simulator architecture, API boundaries, and Timeloop-only correctness model.
 - `docs/cli_and_api.md`: command-line and Python API usage.
 - `docs/rosa_application.md`: ROSA application workflow and validation.
+- `docs/deap_cnns_application.md`: DEAP-CNNs device extraction, architecture mapping, commands, and limitations.
 - `docs/results_and_artifacts.md`: result files, validation formulas, artifact layout, and glossary.

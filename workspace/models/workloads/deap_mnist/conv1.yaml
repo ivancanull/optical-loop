@@ -1,0 +1,12 @@
+{{include_text('../problem_base.yaml')}}
+problem:
+  <<<: *problem_base
+  instance: {C: 8, M: 8, P: 20, Q: 20, R: 5, S: 5, Hstride: 1, Wstride: 1}
+
+  name: Conv2d
+  dnn_name: deap_mnist
+  notes: DEAP-CNNs MNIST second optical convolution, 24x24x8 to 20x20x8.
+  histograms:
+    Inputs:  [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+    Weights: [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+    Outputs: [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
