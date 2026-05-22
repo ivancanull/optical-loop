@@ -1,6 +1,18 @@
 # Results And Validation
 
-This document catalogs the committed OpticalLoop reference artifacts and explains how validation proves they match the ROSA/Timeloop gold values.
+This document catalogs the committed OpticalLoop reference artifacts and explains how validation proves they match the checked ROSA/Timeloop gold values.
+
+## Paper Result Context
+
+The ROSA paper reports three headline trends:
+
+| Paper claim area | Paper-reported result |
+| --- | --- |
+| Optimized MRR array sizing | Aggregated relative EDP is reduced by about 64% versus the DEAP-CNNs setting and 26% versus a compact `4 x 4` baseline. |
+| Optical shift-and-add | OSA contributes 29% EDP reduction in the main paper narrative by reducing OAC/ADC and partial-sum traffic. |
+| Layer-wise hybrid mapping | Hybrid mapping reports an 8.3% CIFAR-10 accuracy gain over WS mapping and 54.7% lower EDP than DEAP-CNNs. |
+
+These paper-level claims provide context for the artifact. The executable validation in this repo checks the committed Timeloop-backed architecture CSVs, ranking formulas, schemas, and portable paths. It does not rerun the paper's PyTorch DAC/thermal noise and accuracy simulations.
 
 ## Committed Result Files
 
@@ -46,7 +58,7 @@ EDP, Relative_Latency, Relative_Energy_per_MAC, Combined_Score
 
 ## Validation Targets
 
-The validator checks these headline values with absolute and relative tolerance `1e-9`:
+The validator checks these committed artifact values with absolute and relative tolerance `1e-9`:
 
 | Check | Expected value |
 | --- | --- |
@@ -55,7 +67,7 @@ The validator checks these headline values with absolute and relative tolerance 
 | Six-network best architecture | `T1, P32, C8, R4` |
 | Six-network best score | `0.8529673580` |
 
-The validator also checks that committed final CSVs do not contain machine-specific absolute path strings.
+The validator also checks required CSV schemas, row counts, recomputed ranking formulas, and absence of machine-specific absolute path strings in final CSV fields.
 
 ## Ranking Formula
 
@@ -100,3 +112,17 @@ Rows where `passed` is false identify the exact artifact, check, expected value,
 `alexnet_osa_edp_comparison.png` compares no-OSA and OSA EDP for the same architecture labels. It is intended as a quick visual check that the OSA sweep preserves the same architecture set and exposes the AlexNet best point.
 
 `six_network_osa_ranking.png` displays the aggregate architecture scores after applying the six-network formula. Lower bars are better; the leftmost ranked winner should be `T1, P32, C8, R4`.
+
+## Glossary
+
+| Term | Meaning |
+| --- | --- |
+| ADC | Analog-to-digital converter after optical/electrical accumulation. |
+| EDP | Energy-delay product, the optimization metric combining energy and latency. |
+| IS | Input-stationary mapping, where input features are programmed onto weight MRRs and weights are encoded by broadcast MRRs. |
+| MRR | Microring resonator, the optical device used for modulation and weight realization. |
+| OAC | Optical-to-analog conversion stage before digitization. |
+| OPE | Optical processing element, the MRR-array compute unit inside a tile. |
+| OSA | Optical shift-and-add, the proposed optical accumulation module that reduces conversion and partial-sum traffic. |
+| WDM | Wavelength-division multiplexing, used to process multiple optical channels in parallel. |
+| WS | Weight-stationary mapping, where weight MRR voltages are held while input features stream through the inner loops. |
