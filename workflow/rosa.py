@@ -930,7 +930,7 @@ def _resolve_path(repo_root: Path, path: Path) -> Path:
 
 
 def _default_repo_root() -> Path:
-    return Path(__file__).resolve().parents[2]
+    return Path(__file__).resolve().parents[1]
 
 
 def _default_workspace_dir(repo_root: Path) -> Path:

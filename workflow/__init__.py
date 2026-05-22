@@ -9,6 +9,11 @@ from opticalloop.workflow.rosa import (
     RosaWorkflowSpec,
     default_rosa_workflow,
 )
+from opticalloop.workflow.validation import (
+    RosaResultValidator,
+    ValidationCheck,
+    write_reference_artifacts,
+)
 
 __all__ = [
     "ArchitectureSetting",
@@ -17,5 +22,8 @@ __all__ = [
     "MacroVariant",
     "RosaWorkflow",
     "RosaWorkflowSpec",
+    "RosaResultValidator",
+    "ValidationCheck",
     "default_rosa_workflow",
+    "write_reference_artifacts",
 ]

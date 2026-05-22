@@ -8,6 +8,10 @@ __pycache__/
 
 workspace/outputs/
 results/
+!examples/results/
+!examples/results/*.csv
+!examples/plots/
+!examples/plots/*.png
 temp/
 
 timeloop-mapper.*
