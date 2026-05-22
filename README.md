@@ -111,6 +111,7 @@ conda run -n timeloop python optical_loop.py deap-cnns --mode rerun --stage all
 
 - `docs/simulator_overview.md`: simulator architecture, API boundaries, and Timeloop-only correctness model.
 - `docs/cli_and_api.md`: command-line and Python API usage.
+- `docs/macro_dataflow_mapping.md`: macro names, dataflow constraints, hybrid selection rules, and reproduction knobs.
 - `docs/rosa_application.md`: ROSA application workflow and validation.
 - `docs/deap_cnns_application.md`: DEAP-CNNs device extraction, architecture mapping, commands, and limitations.
 - `docs/results_and_artifacts.md`: result files, validation formulas, artifact layout, and glossary.
