@@ -1,5 +1,6 @@
 """Layer-level simulation APIs."""
 
-from opticalloop.simulator.layer_simulator import LayerSimulator, SimulationResult
+from opticalloop.result import SimulationResult
+from opticalloop.simulator.layer_simulator import LayerSimulator
 
 __all__ = ["LayerSimulator", "SimulationResult"]

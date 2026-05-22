@@ -1,29 +1,23 @@
-"""ROSA reproduction workflows for OpticalLoop."""
+"""Reusable workflow utilities for OpticalLoop applications."""
 
-from opticalloop.workflow.rosa import (
-    ArchitectureSetting,
+from opticalloop.workflow.results import (
     ArtifactPaths,
-    HybridMappingSpec,
-    MacroVariant,
-    RosaWorkflow,
-    RosaWorkflowSpec,
-    default_rosa_workflow,
-)
-from opticalloop.workflow.validation import (
-    RosaResultValidator,
-    ValidationCheck,
-    write_reference_artifacts,
+    aggregate_metrics_csv,
+    artifact_paths,
+    calculate_aggregated_metrics,
+    parse_detailed_data,
+    reconstruct_breakdown_csv,
+    write_architecture_metrics_csv,
+    write_results_csv,
 )
 
 __all__ = [
-    "ArchitectureSetting",
     "ArtifactPaths",
-    "HybridMappingSpec",
-    "MacroVariant",
-    "RosaWorkflow",
-    "RosaWorkflowSpec",
-    "RosaResultValidator",
-    "ValidationCheck",
-    "default_rosa_workflow",
-    "write_reference_artifacts",
+    "aggregate_metrics_csv",
+    "artifact_paths",
+    "calculate_aggregated_metrics",
+    "parse_detailed_data",
+    "reconstruct_breakdown_csv",
+    "write_architecture_metrics_csv",
+    "write_results_csv",
 ]

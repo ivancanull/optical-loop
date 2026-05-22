@@ -21,7 +21,7 @@ class TimeloopRun:
 
 @dataclass(frozen=True)
 class TimeloopBackend:
-    """Run CIMLoop/Timeloop and convert mapper stats to `SimulationResult`."""
+    """Run Timeloop and convert mapper stats to `SimulationResult`."""
 
     scripts_dir: Optional[Path] = None
     quick_run: Optional[Callable] = None
@@ -37,7 +37,7 @@ class TimeloopBackend:
     def run_batch(
         self, runs: Sequence[TimeloopRun], n_jobs: Optional[int] = None
     ) -> List[SimulationResult]:
-        """Run a batch through CIMLoop's Timeloop helpers.
+        """Run a batch through the vendored Timeloop helper layer.
 
         `quick_run` injection is intentionally executed sequentially so unit
         tests can assert exact call order without joblib process boundaries.

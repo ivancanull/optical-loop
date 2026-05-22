@@ -1,4 +1,4 @@
-"""Readers for persisted Timeloop/CIMLoop result CSVs."""
+"""Readers for persisted Timeloop result CSVs."""
 
 import csv
 import re

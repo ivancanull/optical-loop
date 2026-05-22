@@ -8,10 +8,11 @@ __pycache__/
 
 workspace/outputs/
 results/
-!examples/results/
-!examples/results/*.csv
-!examples/plots/
-!examples/plots/*.png
+!examples/rosa/
+!examples/rosa/results/
+!examples/rosa/results/*.csv
+!examples/rosa/plots/
+!examples/rosa/plots/*.png
 temp/
 
 timeloop-mapper.*

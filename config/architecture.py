@@ -16,7 +16,7 @@ def _require_positive_float(name: str, value: float) -> None:
 
 @dataclass(frozen=True)
 class MRRMacroConfig:
-    """MRR macro settings forwarded to Timeloop/CIMLoop.
+    """MRR macro settings forwarded to Timeloop.
 
     The shape fields map directly onto Timeloop variables. Timing, energy, and
     area are intentionally not modeled here because they must come from

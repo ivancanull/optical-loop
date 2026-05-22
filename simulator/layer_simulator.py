@@ -12,7 +12,7 @@ from opticalloop.result import SimulationResult
 
 @dataclass(frozen=True)
 class LayerSimulator:
-    """Return Timeloop/CIMLoop result data for one workload layer."""
+    """Return Timeloop-backed result data for one workload layer."""
 
     layer: TimeloopLayerRef
     architecture: MRRMacroConfig

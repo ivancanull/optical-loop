@@ -10,7 +10,7 @@ def _require_positive_int(name: str, value: int) -> None:
 
 @dataclass(frozen=True)
 class TimeloopLayerRef:
-    """Reference to a layer already represented in CIMLoop/Timeloop workloads."""
+    """Reference to a layer already represented in Timeloop workload YAMLs."""
 
     network: str
     layer_path: str
@@ -31,7 +31,7 @@ class LinearLayerConfig:
     """Legacy metadata for dense layers.
 
     Production OpticalLoop simulations do not use this class to compute energy,
-    cycles, or latency. Those values must come from Timeloop/CIMLoop outputs.
+    cycles, or latency. Those values must come from Timeloop outputs.
     """
 
     batch_size: int

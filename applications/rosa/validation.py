@@ -15,7 +15,7 @@ import pandas as pd
 from opticalloop.config.architecture import MRRMacroConfig
 from opticalloop.config.workload import TimeloopLayerRef
 from opticalloop.simulator.layer_simulator import LayerSimulator
-from opticalloop.workflow.plots import write_reference_plots
+from opticalloop.applications.rosa.plots import write_reference_plots
 
 
 TOLERANCE = 1e-9
@@ -94,7 +94,7 @@ class RosaResultValidator:
 
     def __init__(
         self,
-        results_dir: Path = Path("examples/results"),
+        results_dir: Path = Path("examples/rosa/results"),
         *,
         tolerance: float = TOLERANCE,
     ) -> None:
@@ -349,8 +349,8 @@ class RosaResultValidator:
 def write_reference_artifacts(
     *,
     source_results_dir: Path,
-    output_results_dir: Path = Path("examples/results"),
-    output_plots_dir: Path = Path("examples/plots"),
+    output_results_dir: Path = Path("examples/rosa/results"),
+    output_plots_dir: Path = Path("examples/rosa/plots"),
     validation_report_name: str = "validation_report.csv",
 ) -> Mapping[str, Path]:
     """Copy lightweight gold CSVs, validate them, and generate plots."""

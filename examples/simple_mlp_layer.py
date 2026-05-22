@@ -1,4 +1,4 @@
-"""Read a cached Timeloop/CIMLoop result for one AlexNet layer."""
+"""Read a cached Timeloop result for one AlexNet layer."""
 
 import importlib.util
 import sys
@@ -28,7 +28,7 @@ from opticalloop import LayerSimulator, MRRMacroConfig, TimeloopLayerRef, Timelo
 
 
 def main() -> None:
-    repo_root = Path(__file__).resolve().parents[2]
+    repo_root = Path(__file__).resolve().parents[1]
     layer = TimeloopLayerRef(network="alexnet", layer_path="alexnet/0")
     architecture = MRRMacroConfig(n_tiles=1, n_pes=1, n_cols=100, n_rows=12)
     cache = TimeloopResultCache(results_dir=repo_root / "results")

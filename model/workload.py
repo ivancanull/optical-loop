@@ -1,4 +1,4 @@
-"""Workload model wrappers."""
+"""Workload metadata wrappers."""
 
 from dataclasses import dataclass
 
@@ -7,7 +7,7 @@ from opticalloop.config.workload import LinearLayerConfig
 
 @dataclass(frozen=True)
 class LinearLayer:
-    """Runtime workload model for a dense linear layer."""
+    """Metadata wrapper for a dense linear layer."""
 
     config: LinearLayerConfig
 

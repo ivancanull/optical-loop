@@ -1,4 +1,4 @@
-"""Mapping configuration and access-count boundary for Timeloop adapters."""
+"""Mapping metadata and access-count boundaries for Timeloop adapters."""
 
 from dataclasses import dataclass
 from typing import Mapping, Optional
@@ -27,11 +27,10 @@ def _require_non_negative_int(name: str, value: int) -> None:
 
 @dataclass(frozen=True)
 class MappingConfig:
-    """Loop mapping/reuse summary for the minimal simulator.
+    """Loop mapping/reuse metadata for external Timeloop adapters.
 
-    Reuse factors divide the default analytic access counts. Explicit access
-    counts override only the components provided, which is the intended V1
-    adapter boundary for later Timeloop integration.
+    This class does not estimate energy or latency. It stores optional access
+    counts that an adapter may use when constructing Timeloop inputs.
     """
 
     input_reuse: float = 1.0

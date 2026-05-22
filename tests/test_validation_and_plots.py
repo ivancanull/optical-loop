@@ -4,8 +4,8 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from opticalloop.workflow.plots import write_reference_plots
-from opticalloop.workflow.validation import RosaResultValidator
+from opticalloop.applications.rosa.plots import write_reference_plots
+from opticalloop.applications.rosa.validation import RosaResultValidator
 
 
 NETWORKS = (
@@ -68,7 +68,7 @@ def test_reference_plots_are_non_empty_pngs(tmp_path: Path) -> None:
 
 def test_committed_reference_artifacts_validate_and_are_portable() -> None:
     repo_root = Path(__file__).resolve().parents[1]
-    results_dir = repo_root / "examples" / "results"
+    results_dir = repo_root / "examples" / "rosa" / "results"
 
     validator = RosaResultValidator(results_dir)
     report = validator.validate()

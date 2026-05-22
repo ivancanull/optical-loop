@@ -1,4 +1,4 @@
-"""Result objects populated from Timeloop/CIMLoop outputs."""
+"""Result objects populated from Timeloop outputs."""
 
 from dataclasses import dataclass, field
 from typing import Dict, Mapping, Optional
@@ -65,7 +65,11 @@ class SimulationResult:
             cycle_seconds=cycle_seconds,
             latency_s=float(latency),
             energy_j=float(getattr(stats, "energy")),
-            area_mm2=float(getattr(stats, "area")) if getattr(stats, "area", None) is not None else None,
+            area_mm2=(
+                float(getattr(stats, "area"))
+                if getattr(stats, "area", None) is not None
+                else None
+            ),
             tops=float(getattr(stats, "tops")) if getattr(stats, "tops", None) is not None else None,
             tops_per_w=(
                 float(getattr(stats, "tops_per_w"))

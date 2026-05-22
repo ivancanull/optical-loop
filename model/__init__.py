@@ -1,4 +1,4 @@
-"""Core model objects for Optical Loop."""
+"""Lightweight metadata wrappers for OpticalLoop."""
 
 from opticalloop.model.mapping import MappingConfig
 from opticalloop.model.optical_array import OpticalArray

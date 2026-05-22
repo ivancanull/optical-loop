@@ -1,4 +1,4 @@
-"""Optical array model wrappers."""
+"""Optical array metadata wrappers."""
 
 from dataclasses import dataclass
 
@@ -7,7 +7,7 @@ from opticalloop.config.architecture import MRRMacroConfig
 
 @dataclass(frozen=True)
 class OpticalArray:
-    """Runtime model for an MRR optical macro array."""
+    """Metadata wrapper for an MRR optical macro array."""
 
     config: MRRMacroConfig
 
