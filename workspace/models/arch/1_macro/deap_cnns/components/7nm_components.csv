@@ -47,7 +47,7 @@ technology,scaling,resolution,action,energy,area,global_cycle_seconds,comment
 7nm,aggressive,8,compute|read|write|update,0,410,1,energy in pJ;
 7nm,aggressive,8,leak,0.155e9,410,1
 7nm,deapcnns,7,compute|read|write|update,0,410,1,DEAP-CNNs MRR static power encoded as leak
-7nm,deapcnns,7,leak,0.0195e9,410,1
+7nm,deapcnns,7,leak,19.5e9,410,1
 
 COMPONENT: tomrr
 technology,scaling,resolution,action,energy,area,global_cycle_seconds,comment
@@ -58,7 +58,7 @@ technology,scaling,resolution,action,energy,area,global_cycle_seconds,comment
 7nm,aggressive,8,compute|read|write|update,0,400,1,energy in pJ;
 7nm,aggressive,8,leak,1.3e9,400,1
 7nm,deapcnns,7,compute|read|write|update,0,400,1,DEAP-CNNs MRR static power encoded as leak
-7nm,deapcnns,7,leak,0.0195e9,400,1
+7nm,deapcnns,7,leak,19.5e9,400,1
 
 COMPONENT: eomrr
 technology,scaling,resolution,action,energy,area,global_cycle_seconds,comment
@@ -69,7 +69,7 @@ technology,scaling,resolution,action,energy,area,global_cycle_seconds,comment
 7nm,aggressive,8,compute|read|write|update,0.00063,400,1,energy in pJ;
 7nm,aggressive,8,leak,1.3e9,400,1
 7nm,deapcnns,7,compute|read|write|update,0,400,1,DEAP-CNNs MRR static power encoded as leak
-7nm,deapcnns,7,leak,0.0195e9,400,1
+7nm,deapcnns,7,leak,19.5e9,400,1
 
 COMPONENT: microdisk
 technology,scaling,resolution,action,energy,area,global_cycle_seconds,comment
@@ -115,7 +115,7 @@ technology,scaling,resolution,action,energy,area,global_cycle_seconds,comment
 7nm,aggressive,8,compute|read|write|update,0,6153,1,energy in pJ;
 7nm,aggressive,8,leak,0.0713e9,6153,1
 7nm,deapcnns,7,compute|read|write|update,0,6153,1,DEAP-CNNs laser static power encoded as leak
-7nm,deapcnns,7,leak,0.1e9,6153,1
+7nm,deapcnns,7,leak,100e9,6153,1
 
 
 COMPONENT: photodiode

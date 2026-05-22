@@ -5,9 +5,10 @@ from __future__ import annotations
 import math
 import re
 import subprocess
+import csv
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Iterable, List, Mapping, Optional
+from typing import Dict, Iterable, List, Mapping, Optional
 
 import pandas as pd
 import yaml
@@ -83,6 +84,7 @@ class DeapResultValidator:
         checks.extend(self._validate_reference_not_tracked())
         checks.extend(self._validate_device_spec())
         checks.extend(self._validate_timeloop_asset_parameters())
+        checks.extend(self._validate_component_power_encoding())
         checks.extend(self._validate_architecture_constraints())
         checks.extend(self._validate_artifact_files())
         checks.extend(self._validate_no_absolute_paths())
@@ -203,6 +205,67 @@ class DeapResultValidator:
                         str(actual).strip('"') == str(expected),
                     )
                 )
+        return checks
+
+    def _validate_component_power_encoding(self) -> List[ValidationCheck]:
+        components_path = (
+            self.repo_root
+            / "workspace"
+            / "models"
+            / "arch"
+            / "1_macro"
+            / "deap_cnns"
+            / "components"
+            / "7nm_components.csv"
+        )
+        checks = [
+            _check(
+                components_path,
+                "component_csv_exists",
+                "true",
+                str(components_path.exists()).lower(),
+                0.0,
+                components_path.exists(),
+            )
+        ]
+        if not components_path.exists():
+            return checks
+
+        rows = _component_rows(components_path)
+        expected_energy_values = {
+            ("tia_", "convert|read"): 3.4,
+            ("tia", "convert|read"): 3.4,
+            ("dac_cache", "write|update"): 5.2,
+            # Component CSV leak energies use pJ/s. 100 mW = 100e9 pJ/s,
+            # 19.5 mW = 19.5e9 pJ/s.
+            ("mrr", "leak"): 19.5e9,
+            ("tomrr", "leak"): 19.5e9,
+            ("eomrr", "leak"): 19.5e9,
+            ("laser", "leak"): 100e9,
+        }
+        for (component, action), expected in expected_energy_values.items():
+            row = rows.get((component, "deapcnns", "7", action))
+            checks.append(
+                _check(
+                    components_path,
+                    f"component:{component}:{action}:exists",
+                    "present",
+                    "present" if row is not None else "missing",
+                    0.0,
+                    row is not None,
+                )
+            )
+            if row is None:
+                continue
+            checks.append(
+                _numeric_check(
+                    components_path,
+                    f"component:{component}:{action}:energy",
+                    expected,
+                    float(row["energy"]),
+                    self.tolerance,
+                )
+            )
         return checks
 
     def _validate_architecture_constraints(self) -> List[ValidationCheck]:
@@ -399,3 +462,34 @@ def _absolute_path_values(dataframe: pd.DataFrame) -> List[str]:
             if pattern.search(value):
                 offenders.append(f"{column}={value}")
     return offenders
+
+
+def _component_rows(path: Path) -> Dict[tuple, Dict[str, str]]:
+    rows: Dict[tuple, Dict[str, str]] = {}
+    component = ""
+    header: Optional[List[str]] = None
+    for raw_line in path.read_text().splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        if line.startswith("COMPONENT:"):
+            component = line.split(":", 1)[1].strip()
+            header = None
+            continue
+        if not component:
+            continue
+        parts = next(csv.reader([line]))
+        if header is None:
+            header = parts
+            continue
+        if len(parts) < len(header):
+            parts = [*parts, *([""] * (len(header) - len(parts)))]
+        row = dict(zip(header, parts))
+        key = (
+            component,
+            row.get("scaling", ""),
+            row.get("resolution", ""),
+            row.get("action", ""),
+        )
+        rows[key] = row
+    return rows

@@ -36,7 +36,7 @@ The DEAP-CNNs device constants are stored in `DeapDeviceSpec` and emitted to `ex
 | Output cycle | 200 ps |
 | Device power | laser 100 mW, MRR 19.5 mW, DAC 26 mW, TIA 17 mW, ADC 76 mW |
 
-Power values are encoded in the Timeloop/Accelergy assets using the existing photonic component-table convention where possible. The DEAP-CNNs ADC uses the shared ADC estimator with `ADC_ENERGY_SCALE` calibrated to 76 mW at the 200 ps output cycle. These values are not evaluated by a separate OpticalLoop energy simulator.
+Power values are encoded in the Timeloop/Accelergy assets using the existing photonic component-table convention where possible. TIA and DAC power are encoded as per-action energy at the 200 ps output cycle; laser and MRR static power are encoded as component-table leak power in pJ/s. The DEAP-CNNs ADC uses the shared ADC estimator with `ADC_ENERGY_SCALE` calibrated to 76 mW at the 200 ps output cycle. These values are not evaluated by a separate OpticalLoop energy simulator.
 
 ## Architecture Mapping
 

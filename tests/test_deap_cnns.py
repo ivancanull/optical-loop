@@ -77,6 +77,24 @@ def test_deap_timeloop_asset_contains_device_calibration() -> None:
     assert variables["DEAP_OUTPUT_CYCLE_PS"] == 200
 
 
+def test_deap_component_csv_encodes_device_power() -> None:
+    components_path = (
+        Path("workspace")
+        / "models"
+        / "arch"
+        / "1_macro"
+        / "deap_cnns"
+        / "components"
+        / "7nm_components.csv"
+    )
+    text = components_path.read_text()
+
+    assert "7nm,deapcnns,7,leak,100e9" in text
+    assert text.count("7nm,deapcnns,7,leak,19.5e9") == 3
+    assert "7nm,deapcnns,7,write|update,5.2" in text
+    assert "7nm,deapcnns,7,convert|read,3.4" in text
+
+
 def test_deap_workflow_forwards_to_timeloop_backend(tmp_path: Path) -> None:
     calls = []
 
