@@ -108,6 +108,19 @@ def test_doctor_reports_absent_native_tools(manifest, monkeypatch) -> None:
     assert report.loc["accelergy:plugin_discovery", "status"] == "FAIL"
 
 
+def test_doctor_accepts_static_mapper_shared_library_check(monkeypatch) -> None:
+    completed = __import__("subprocess").CompletedProcess(
+        args=["ldd", "timeloop-mapper"],
+        returncode=1,
+        stdout="",
+        stderr="not a dynamic executable\n",
+    )
+    monkeypatch.setattr("subprocess.run", lambda *args, **kwargs: completed)
+    passed, detail = EnvironmentDoctor._shared_libraries("/tmp/timeloop-mapper")
+    assert passed
+    assert detail == "static executable"
+
+
 def test_resume_rejects_changed_provenance(manifest, tmp_path: Path) -> None:
     runner = ReproductionRunner(manifest, tmp_path, backend=FakeBackend())
     run_dir = runner.run("smoke", workers=1)

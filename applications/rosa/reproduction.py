@@ -246,8 +246,17 @@ class EnvironmentDoctor:
         completed = subprocess.run(
             ["ldd", mapper], capture_output=True, text=True, timeout=10, check=False
         )
-        missing = [line.strip() for line in completed.stdout.splitlines() if "not found" in line]
-        return not missing and completed.returncode == 0, "; ".join(missing) or "all resolved"
+        output = "\n".join((completed.stdout, completed.stderr)).strip()
+        missing = [line.strip() for line in output.splitlines() if "not found" in line]
+        static_binary = any(
+            marker in output.lower()
+            for marker in ("statically linked", "not a dynamic executable")
+        )
+        passed = not missing and (completed.returncode == 0 or static_binary)
+        detail = "; ".join(missing) or (
+            "static executable" if static_binary else "all resolved"
+        )
+        return passed, detail
 
     @staticmethod
     def _accelergy_plugins() -> tuple[bool, str]:
