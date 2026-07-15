@@ -16,17 +16,18 @@ The core code does not estimate energy, latency, cycles, area, or component brea
 
 | Component | Responsibility |
 | --- | --- |
-| `MRRMacroConfig` | Macro shape and Timeloop variables such as tiles, PEs, rows, columns, macro family, system, scaling, and DAC resolution. |
+| `TimeloopMacroConfig` | Generic macro name, system, and explicit Timeloop variable dictionary. |
+| `MRRMacroConfig` | Convenience macro shape for ROSA/MRR-style variables such as tiles, PEs, rows, columns, scaling, and DAC resolution. |
 | `TimeloopLayerRef` | Reference to a workload layer already represented in `workspace/models/workloads/`. |
 | `TimeloopBackend` | Adapter for `quick_run` and batch mapper execution. |
-| `SimulationResult` | Normalized Timeloop stats, including energy, latency, cycles, area, TOPS, and component breakdowns. |
+| `SimulationResult` | Normalized Timeloop stats, including energy, latency, cycles, area, TOPS, component breakdowns, and mapper loop text when available. |
 | `LayerSimulator` | Layer-level facade that optionally checks a `TimeloopResultCache` before calling the backend. |
 | `workflow/results.py` | Generic CSV writers, reconstruction, aggregation, and architecture metrics. |
 | `module_data.py` | Tidy one-row-per-module data derived from `SimulationResult` objects. |
 
 ## Applications
 
-Applications live under `applications/`. They can define presets, workflow stages, validation rules, plots, and committed examples while reusing the simulator core. ROSA is the first included application workflow.
+Applications can define presets, workflow stages, validation rules, plots, and committed examples while reusing the simulator core. The included application workflow is ROSA. DEAP-CNNs is kept as a notebook example that uses the same generic backend with the canonical `deap_cnns` macro, explicit workload names, and explicit variables.
 
 ## Workspace
 
@@ -41,3 +42,7 @@ Applications live under `applications/`. They can define presets, workflow stage
 ## Portability
 
 Generated full result trees stay in ignored `results/` directories. Committed examples are small, portable, and must not contain machine-specific absolute paths.
+
+## Development Rules
+
+Project-level development rules live in `docs/development_guidelines.md`. In short: keep the design object-oriented but simple, keep raw Timeloop and external-library calls inside adapter layers, and update tests when behavior changes.

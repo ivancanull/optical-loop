@@ -1,7 +1,7 @@
 """Timeloop-backed optical macro architecture configuration objects."""
 
-from dataclasses import dataclass
-from typing import Optional
+from dataclasses import dataclass, field
+from typing import Mapping, Optional
 
 
 def _require_positive_int(name: str, value: int) -> None:
@@ -12,6 +12,42 @@ def _require_positive_int(name: str, value: int) -> None:
 def _require_positive_float(name: str, value: float) -> None:
     if not isinstance(value, (int, float)) or value <= 0:
         raise ValueError(f"{name} must be positive, got {value!r}")
+
+
+@dataclass(frozen=True)
+class TimeloopMacroConfig:
+    """Generic Timeloop macro configuration.
+
+    This is the lowest-level public architecture object: it forwards a macro
+    name and an explicit variable dictionary to Timeloop without assuming an
+    MRR row/column naming convention.
+    """
+
+    macro: str
+    variables: Mapping[str, object] = field(default_factory=dict)
+    system: str = "fetch_all_lpddr4"
+    architecture_key: Optional[str] = None
+    max_utilization: bool = True
+
+    def __post_init__(self) -> None:
+        if not self.macro:
+            raise ValueError("macro cannot be empty")
+        if not self.system:
+            raise ValueError("system cannot be empty")
+        object.__setattr__(self, "variables", dict(self.variables))
+        if self.architecture_key is None:
+            object.__setattr__(self, "architecture_key", self._default_key())
+
+    def to_timeloop_variables(self) -> dict:
+        return dict(self.variables)
+
+    def _default_key(self) -> str:
+        if not self.variables:
+            return self.macro
+        variable_text = ", ".join(
+            f"{key}={self.variables[key]}" for key in sorted(self.variables)
+        )
+        return f"{self.macro}({variable_text})"
 
 
 @dataclass(frozen=True)

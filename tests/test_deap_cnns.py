@@ -1,166 +1,131 @@
+import json
+import re
+import subprocess
+import sys
 from pathlib import Path
 
-import pandas as pd
-import pytest
 import yaml
 
-import optical_loop
-from opticalloop.applications.deap_cnns import (
-    DeapArchitectureSetting,
-    DeapDeviceSpec,
-    DeapResultValidator,
-    default_deap_workflow,
-    write_deap_artifacts,
-)
+
+DEAP_MACRO_DIR = Path("workspace") / "models" / "arch" / "1_macro" / "deap_cnns"
+DEAP_WORKLOAD_DIR = Path("workspace") / "models" / "workloads" / "deap_deepbench"
+DEAP_NOTEBOOK = Path("examples") / "deap_cnns" / "deap_cnns_reproduction.ipynb"
 
 
-class FakeStats:
-    cycles = 10
-    cycle_seconds = 2e-10
-    latency = 2e-9
-    energy = 3e-6
-    area = 4e-3
-    tops = 5.0
-    tops_per_w = 6.0
-    tops_per_mm2 = 7.0
-    computes = 8.0
-    per_component_energy = {"laser": 1e-6}
-    per_component_area = {"laser": 2e-3}
-    per_component_power = {"laser": 3.0}
-
-
-def test_deap_device_spec_matches_article_constants() -> None:
-    device = DeapDeviceSpec()
-
-    assert device.mrr_precision_bits == 7
-    assert device.mrr_self_coupling == pytest.approx(0.99)
-    assert device.mrr_loss == pytest.approx(0.99)
-    assert device.max_wavelengths == 100
-    assert device.max_modulators == 1024
-    assert device.waveguide_width_nm == 500
-    assert device.waveguide_thickness_nm == 220
-    assert device.waveguide_bend_radius_um == 5
-    assert device.output_cycle_ps == 200
-    assert device.laser_power_mw == pytest.approx(100.0)
-    assert device.adc_power_mw == pytest.approx(76.0)
-
-
-def test_deap_architecture_constraints() -> None:
-    mnist = DeapArchitectureSetting("mnist-default", 1, 5, 8)
-    edge_small = DeapArchitectureSetting("edge-small", 1, 3, 113)
-    edge_large = DeapArchitectureSetting("edge-large", 1, 10, 10)
-
-    assert mnist.n_wavelengths == 25
-    assert mnist.n_modulators == 200
-    assert edge_small.n_wavelengths == 9
-    assert edge_small.n_modulators == 1017
-    assert edge_large.n_wavelengths == 100
-    assert edge_large.n_modulators == 1000
-
-    with pytest.raises(ValueError, match="1024"):
-        DeapArchitectureSetting("paper-edge-large-stated", 1, 10, 12)
-
-
-def test_deap_timeloop_asset_contains_device_calibration() -> None:
-    variables_path = (
-        Path("workspace")
-        / "models"
-        / "arch"
-        / "1_macro"
-        / "deap_cnns"
-        / "variables_iso.yaml"
-    )
-    variables = yaml.safe_load(variables_path.read_text())["variables"]
-
-    assert variables["DEAP_ADC_POWER_MW"] == 76
-    assert variables["ADC_ENERGY_SCALE"] == pytest.approx(0.076 / 0.52136)
-    assert variables["DEAP_OUTPUT_CYCLE_PS"] == 200
-
-
-def test_deap_component_csv_encodes_device_power() -> None:
-    components_path = (
-        Path("workspace")
-        / "models"
-        / "arch"
-        / "1_macro"
-        / "deap_cnns"
-        / "components"
-        / "7nm_components.csv"
-    )
-    text = components_path.read_text()
-
-    assert "7nm,deapcnns,7,leak,100e9" in text
-    assert text.count("7nm,deapcnns,7,leak,19.5e9") == 3
-    assert "7nm,deapcnns,7,write|update,5.2" in text
-    assert "7nm,deapcnns,7,convert|read,3.4" in text
-
-
-def test_deap_workflow_forwards_to_timeloop_backend(tmp_path: Path) -> None:
-    calls = []
-
-    def fake_quick_run(**kwargs):
-        calls.append(kwargs)
-        return FakeStats()
-
-    from opticalloop.backend import TimeloopBackend
-
-    workflow = default_deap_workflow(
-        architecture_name="mnist-default",
-        results_dir=tmp_path,
-        backend=TimeloopBackend(quick_run=fake_quick_run),
+def test_deap_cli_interface_removed() -> None:
+    result = subprocess.run(
+        [sys.executable, "optical_loop.py", "--help"],
+        check=True,
+        text=True,
+        capture_output=True,
     )
 
-    workflow.run_sweeps()
+    assert "deap-cnns" not in result.stdout
+    assert not Path("applications/deap_cnns/workflow.py").exists()
+    assert not Path("applications/deap_cnns/validation.py").exists()
 
-    assert [call["layer"] for call in calls] == [
-        "deap_mnist/conv0",
-        "deap_mnist/conv1",
+
+def test_deap_deepbench_keeps_only_notebook_workloads() -> None:
+    workloads = sorted(path.name for path in DEAP_WORKLOAD_DIR.glob("*.yaml"))
+
+    assert workloads == ["bench0.yaml", "bench1.yaml"]
+    assert "instance: {N: 4, C: 1, M: 32, P: 72, Q: 349, R: 20, S: 5" in (
+        DEAP_WORKLOAD_DIR / "bench0.yaml"
+    ).read_text()
+    assert "instance: {N: 8, C: 64, M: 128, P: 110, Q: 110, R: 3, S: 3" in (
+        DEAP_WORKLOAD_DIR / "bench1.yaml"
+    ).read_text()
+
+
+def test_deap_macro_variables_are_generic_timeloop_inputs() -> None:
+    variables = yaml.safe_load((DEAP_MACRO_DIR / "variables_free.yaml").read_text())[
+        "variables"
     ]
-    assert all(call["macro"] == "deap_cnns" for call in calls)
-    assert all(call["system"] == "fetch_all_lpddr4" for call in calls)
-    assert calls[0]["variables"] == {
-        "SCALING": '"deapcnns"',
-        "N_TILES": 1,
-        "N_PES": 1,
-        "N_COLUMNS": 25,
-        "N_ROWS": 8,
-        "VOLTAGE_DAC_RESOLUTION": 7,
-    }
-    assert calls[0]["max_utilization"] is False
+
+    assert variables["N_COLUMNS"] == 100
+    assert variables["N_ROWS"] == 12
+    assert variables["N_Conv"] == 1
+    assert variables["N_TILES"] == 1
+    assert variables["DAC_UNIT_RESISTANCE"] == 5000
+    assert "N_PES" not in variables
 
 
-def test_deap_artifacts_and_validator(tmp_path: Path) -> None:
-    outputs = write_deap_artifacts(tmp_path)
+def test_deap_canonical_macro_dataflow_and_readout() -> None:
+    text = (DEAP_MACRO_DIR / "arch.yaml").read_text()
 
-    assert set(outputs) == {
-        "device_parameters_deap_cnns.csv",
-        "architecture_summary_deap_cnns.csv",
-        "validation_report.csv",
-    }
-    report = DeapResultValidator(tmp_path).validate()
-    assert report["passed"].all(), report[~report["passed"]].to_string(index=False)
+    conv_unit = _yaml_item_block(text, "conv_unit")
+    wavelength_column = _yaml_item_block(text, "wavelength_column")
+    channel_weight_row = _yaml_item_block(text, "channel_weight_row")
 
-    device = pd.read_csv(tmp_path / "device_parameters_deap_cnns.csv")
-    assert "mrr_precision_bits" in set(device["parameter"])
+    assert "spatial: {meshX: N_Conv}" in conv_unit
+    assert "maximize_dims: [[P, Q], [N]]" in conv_unit
+    assert "spatial: {meshX: N_COLUMNS}" in wavelength_column
+    assert "*spatial_must_reuse_outputs" in wavelength_column
+    assert "maximize_dims: [[R, S]]" in wavelength_column
+    assert "spatial: {meshY: N_ROWS}" in channel_weight_row
+    assert "no_reuse: [Outputs, Weights]" in channel_weight_row
+    assert "factors: [N=1, M=1, P=1, Q=1, R=1, S=1, X=1]" in channel_weight_row
+    assert "maximize_dims: [[C]]" in channel_weight_row
+    for block in (conv_unit, wavelength_column):
+        assert not re.search(r"\bM\b", block)
+        assert not re.search(r"\bK\b", block)
+    assert "maximize_dims: [[M]]" not in channel_weight_row
+    assert "maximize_dims: [[K]]" not in channel_weight_row
+
+    expected_order = [
+        "conv_unit",
+        "TIA",
+        "photodiode_output_readout",
+        "adc",
+        "laser",
+        "dac",
+        "input_mrr",
+        "channel_weight_row",
+        "wavelength_column",
+        "weight_mrr",
+    ]
+    positions = [text.index(f"    name: {name}\n") for name in expected_order]
+    assert positions == sorted(positions)
+
+    assert "n_instances: N_ROWS" in _yaml_item_block(text, "TIA")
+    assert "subclass: deap_adc" in _yaml_item_block(text, "adc")
+    assert "n_instances: N_COLUMNS" in _yaml_item_block(text, "laser")
+    assert "n_instances: N_COLUMNS" in _yaml_item_block(text, "input_mrr")
+    dac = _yaml_item_block(text, "dac")
+    assert "subclass: dac_r2r_ladder_compound" in dac
+    assert "n_instances: N_COLUMNS" in dac
+    assert text.count("subclass: dac_r2r_ladder_compound") == 1
+    assert len(re.findall(r"^\s+name: .*dac\s*$", text, re.MULTILINE)) == 1
+    assert "*virtualized_mac" in text
 
 
-def test_deap_cli_report(capsys) -> None:
-    args = type(
-        "Args",
-        (),
-        {
-            "architecture": "mnist-default",
-            "results_dir": Path("results"),
-            "n_jobs": 1,
-            "mode": "cache",
-            "stage": "report",
-            "artifact_dir": Path("examples/deap_cnns"),
-            "validation_report": None,
-        },
-    )()
+def test_deap_notebook_uses_generic_backend_and_fixed_cases() -> None:
+    notebook = json.loads(DEAP_NOTEBOOK.read_text())
+    source = "\n".join(
+        line
+        for cell in notebook["cells"]
+        for line in cell.get("source", [])
+    )
 
-    optical_loop._run_deap(args)
+    assert "TimeloopBackend" in source
+    assert "TimeloopRun" in source
+    assert "TimeloopLayerRef" in source
+    assert "TimeloopMacroConfig" in source
+    assert "deap_deepbench/bench0" in source
+    assert "deap_deepbench/bench1" in source
+    assert '"N_COLUMNS": 100' in source
+    assert '"N_ROWS": 12' in source
+    assert '"N_COLUMNS": 9' in source
+    assert '"N_ROWS": 113' in source
+    assert "mapping_text" in source
 
-    output = capsys.readouterr().out
-    assert "OpticalLoop DEAP-CNNs report" in output
-    assert "mnist-default" in output
+
+def _yaml_item_block(text: str, name: str) -> str:
+    marker = f"    name: {name}\n"
+    marker_start = text.find(marker)
+    assert marker_start >= 0, name
+    item_start = text.rfind("\n  - !", 0, marker_start)
+    next_item_start = text.find("\n  - !", marker_start + len(marker))
+    if next_item_start < 0:
+        next_item_start = len(text)
+    return text[item_start:next_item_start]

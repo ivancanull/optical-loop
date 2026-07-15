@@ -8,6 +8,7 @@ __pycache__/
 
 workspace/outputs/
 results/
+reproduction-runs/
 paper/
 reference/
 !examples/rosa/
@@ -16,7 +17,7 @@ reference/
 !examples/rosa/plots/
 !examples/rosa/plots/*.png
 !examples/deap_cnns/
-!examples/deap_cnns/*.csv
+!examples/deap_cnns/*.ipynb
 temp/
 
 timeloop-mapper.*

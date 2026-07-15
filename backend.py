@@ -5,11 +5,20 @@ import shutil
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Dict, List, Mapping, Optional, Sequence
+from typing import Callable, Dict, List, Mapping, Optional, Protocol, Sequence
 
-from opticalloop.config.architecture import MRRMacroConfig
 from opticalloop.config.workload import TimeloopLayerRef
 from opticalloop.result import SimulationResult
+
+
+class TimeloopArchitectureConfig(Protocol):
+    macro: str
+    system: str
+    max_utilization: bool
+    architecture_key: str
+
+    def to_timeloop_variables(self) -> dict:
+        ...
 
 
 @dataclass(frozen=True)
@@ -17,7 +26,7 @@ class TimeloopRun:
     """One Timeloop mapper request owned by the backend adapter."""
 
     layer: TimeloopLayerRef
-    architecture: MRRMacroConfig
+    architecture: TimeloopArchitectureConfig
     metadata: Mapping[str, object] = field(default_factory=dict)
 
 
@@ -29,7 +38,7 @@ class TimeloopBackend:
     quick_run: Optional[Callable] = None
 
     def run_layer(
-        self, layer: TimeloopLayerRef, architecture: MRRMacroConfig
+        self, layer: TimeloopLayerRef, architecture: TimeloopArchitectureConfig
     ) -> SimulationResult:
         quick_run = self.quick_run or self._load_quick_run()
         run = TimeloopRun(layer=layer, architecture=architecture)

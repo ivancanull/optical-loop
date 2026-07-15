@@ -1,11 +1,11 @@
 {{include_text('../problem_base.yaml')}}
 problem:
   <<<: *problem_base
-  instance: {C: 8, M: 8, P: 20, Q: 20, R: 5, S: 5, Hstride: 1, Wstride: 1}
+  instance: {N: 8, C: 64, M: 128, P: 110, Q: 110, R: 3, S: 3, Hstride: 1, Wstride: 1}
 
   name: Conv2d
-  dnn_name: deap_mnist
-  notes: DEAP-CNNs MNIST second optical convolution, 24x24x8 to 20x20x8.
+  dnn_name: deap_deepbench
+  notes: DEAP-CNNs Table II benchmark row 1, W=112 H=112 D=64 N=8 K=128 Rw=3 Rh=3 S=1.
   histograms:
     Inputs:  [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
     Weights: [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]

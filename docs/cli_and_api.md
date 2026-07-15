@@ -2,26 +2,58 @@
 
 OpticalLoop can be used from the repository root without installation because `optical_loop.py` bootstraps the local `opticalloop` package.
 
+## Paper reproduction CLI
+
+Paper readers should use the pinned Docker workflow documented in
+`docs/dac26_reproduction.md`. The underlying commands are:
+
+```bash
+python3 optical_loop.py reproduce doctor
+python3 optical_loop.py reproduce smoke --workers 4
+python3 optical_loop.py reproduce full --workers 4
+python3 optical_loop.py reproduce analyze --run-dir reproduction-runs/<run-id>
+python3 optical_loop.py reproduce validate --run-dir reproduction-runs/<run-id>
+```
+
+`smoke` and `full` run native simulations and then analyze, validate, and
+execute the notebook. Use `--skip-notebook` only for debugging. Successful jobs
+resume by default. `--no-resume` is a safety assertion that rejects an existing
+provenance-keyed run; use it only with an unused `--run-root`.
+
 ## Generic Layer Command
 
 Run one Timeloop-backed layer:
 
 ```bash
 conda run -n timeloop python optical_loop.py layer \
-  --network alexnet \
-  --layer alexnet/0 \
-  --macro proposed_mrr_optical_shift_add \
+  --workload alexnet/0 \
+  --arch proposed_mrr_optical_shift_add \
   --tiles 1 --pes 1 --cols 100 --rows 12
+```
+
+Run an arbitrary macro with explicit Timeloop variables:
+
+```bash
+conda run -n timeloop python optical_loop.py layer \
+  --arch deap_cnns \
+  --workload deap_deepbench/bench0 \
+  --var N_COLUMNS=100 \
+  --var N_ROWS=12 \
+  --var N_Conv=1 \
+  --show-mapping
 ```
 
 Useful options:
 
 | Option | Meaning |
 | --- | --- |
+| `--arch` | Timeloop macro name under `workspace/models/arch/1_macro/`. |
+| `--workload` | Workload layer path under `workspace/models/workloads/`, such as `alexnet/0`. |
+| `--var KEY=VALUE` | Generic Timeloop variable override. Repeat as needed. |
 | `--system` | Timeloop system template name, default `fetch_all_lpddr4`. |
-| `--voltage-dac-resolution` | Forwarded to Timeloop as `VOLTAGE_DAC_RESOLUTION`. |
-| `--scaling` | Forwarded to Timeloop as `SCALING`. |
+| `--tiles`, `--pes`, `--cols`, `--rows` | Convenience MRR shape options used when `--var` is not supplied. |
 | `--max-utilization` | Enables Timeloop max-utilization behavior. |
+| `--show-mapping` | Prints the Timeloop mapper loop text when available. |
 | `--cache-results-dir` | Reads cached reconstructed Timeloop CSVs before running live Timeloop. |
 
 ## ROSA Application Commands
@@ -51,24 +83,15 @@ Run only hybrid mappings:
 conda run -n timeloop python optical_loop.py rosa --mode rerun --stage hybrid --hybrid-family both
 ```
 
-DEAP-CNNs report and validation:
-
-```bash
-conda run -n timeloop python optical_loop.py deap-cnns --stage report
-conda run -n timeloop python optical_loop.py deap-cnns --stage validate
-```
-
-DEAP-CNNs live Timeloop rerun:
-
-```bash
-conda run -n timeloop python optical_loop.py deap-cnns --mode rerun --stage all --architecture mnist-default
-```
-
 ## Python API
+
+From the repository root without installation, import `optical_loop` once to
+bootstrap the local package name before importing from `opticalloop`.
 
 Core usage:
 
 ```python
+import optical_loop  # bootstraps local opticalloop package
 from opticalloop import LayerSimulator, MRRMacroConfig, TimeloopLayerRef
 
 layer = TimeloopLayerRef(network="alexnet", layer_path="alexnet/0")
@@ -81,6 +104,23 @@ architecture = MRRMacroConfig(
     max_utilization=False,
 )
 result = LayerSimulator(layer=layer, architecture=architecture).run()
+```
+
+Generic macro usage:
+
+```python
+import optical_loop  # bootstraps local opticalloop package
+from opticalloop import TimeloopBackend, TimeloopLayerRef, TimeloopMacroConfig
+
+layer = TimeloopLayerRef("deap_deepbench", "deap_deepbench/bench0")
+architecture = TimeloopMacroConfig(
+    macro="deap_cnns",
+    system="fetch_all_lpddr4",
+    variables={"N_COLUMNS": 100, "N_ROWS": 12, "N_Conv": 1},
+    max_utilization=False,
+)
+result = TimeloopBackend().run_layer(layer, architecture)
+print(result.mapping_text)
 ```
 
 ROSA application usage:

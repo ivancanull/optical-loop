@@ -29,21 +29,13 @@ variables:
   VOLTAGE: 1
   TECHNOLOGY: 45 # nm
   CELL_CONFIG: None
-  VOLTAGE_ENERGY_SCALE: (VOLTAGE / 1) ** 2
-  VOLTAGE_LATENCY_SCALE: 1 / VOLTAGE
 
-  # Calibration ---------------------------------------------------------------
+  # Component table selector --------------------------------------------------
   SCALING: "deapcnns"
   scaling: SCALING # The lower-case version is propagated to some plug-ins.
 
-  # Some pretty big scaling factors here because the Albireo paper uses a 28nm
-  # ADC without scaling it to 7nm like the rest of the components, so the ADC is
-  # much higher area and energy than it would be in a 7nm process.
-  # Scale the existing Timeloop/Accelergy ADC estimator to the DEAP-CNNs
-  # 76 mW ADC at the 200 ps output cycle: 0.076 W / 0.52136 W.
-  ADC_ENERGY_SCALE: 0.14577259475218657
-  ADC_AREA_SCALE: 1
-  ROW_COL_DRIVERS_AREA_SCALE: 1
+  # The canonical DEAP-CNNs macro uses CSV-backed component rows directly.
+  # Raw Timeloop results are not adjusted to match the reference columns.
 
   # DEAP-CNNs device parameters extracted from Bangari et al. The live
   # simulation path still goes through Timeloop/Accelergy; these variables keep

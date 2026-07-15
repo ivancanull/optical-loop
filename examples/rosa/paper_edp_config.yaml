@@ -1,0 +1,34 @@
+paper: ROSA DAC26
+scope: energy-delay product only
+technology_nm: 45
+frequency_ghz: 5
+quantization_bits: 8
+workloads:
+  - alexnet
+  - vgg16
+  - resnet18
+  - mobilenet_v3
+  - gpt2_medium
+  - vision_transformer
+architectures:
+  deap_high_channel: {tiles: 1, pes: 1, cols: 9, rows: 113}
+  deap_wide_kernel: {tiles: 1, pes: 1, cols: 100, rows: 12}
+  compact: {tiles: 1, pes: 64, cols: 4, rows: 4}
+  paper_optimum: {tiles: 1, pes: 16, cols: 8, rows: 8}
+constraints:
+  max_cols: 8
+  max_weight_mrrs: 1024
+aggregation:
+  primary_reproduction: geometric_mean_of_network_edp
+  paper_formula: "M = (1-lambda) * geometric_mean + lambda * worst_case"
+  caveat: "The DAC26 TeX does not state lambda, so the notebook reports the directly reproducible geometric mean and the paper targets separately."
+paper_targets:
+  optimized_vs_deap_reduction: 0.64
+  optimized_vs_compact_reduction: 0.26
+  osa_reduction: 0.29
+  osa_with_optimized_ode_reduction: 0.37
+hybrid_edp_j_s:
+  alexnet: {weight_stationary: 0.210, hybrid: 0.204}
+  mobilenet_v3: {weight_stationary: 0.030, hybrid: 0.026}
+  resnet18: {weight_stationary: 1.531, hybrid: 1.493}
+  vgg16: {weight_stationary: 121.5, hybrid: 118.3}

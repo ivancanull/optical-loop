@@ -3,9 +3,13 @@ variables:
   # ===========================================================================
   # Specific to this architecture
   # ===========================================================================
-  N_COLUMNS: 25
-  N_ROWS: 8
-  N_PES: 1
+  # Canonical DEAP-CNNs hardware interpretation:
+  # N_COLUMNS is the R*S wavelength-column count in one convolutional unit.
+  # N_ROWS is the fixed D channel-line / weight-bank capacity.
+  # N_Conv is nconv, the number of parallel convolved output pixels.
+  N_COLUMNS: 100
+  N_ROWS: 12
+  N_Conv: 1
   N_TILES: 1
   # ===========================================================================
   # Set by CiM Processor
@@ -40,12 +44,11 @@ variables:
   VOLTAGE_DAC_RESOLUTION: 7
   TEMPORAL_DAC_RESOLUTION: 1
   DAC_RESOLUTION: max(VOLTAGE_DAC_RESOLUTION, TEMPORAL_DAC_RESOLUTION)
-  N_ADC_PER_BANK: 1
+  DAC_UNIT_RESISTANCE: 5000
 
   # ===========================================================================
   # Hardware
   # ===========================================================================
   BASE_LATENCY: 0.2E-9 # 200 ps per convolved output, DAC/ADC limited in DEAP-CNNs
-  LATENCY_SCALING_SCALE: 1
-  GLOBAL_CYCLE_SECONDS: BASE_LATENCY * LATENCY_SCALING_SCALE * VOLTAGE_LATENCY_SCALE
+  GLOBAL_CYCLE_SECONDS: BASE_LATENCY
   READ_PULSE_WIDTH: GLOBAL_CYCLE_SECONDS

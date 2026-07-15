@@ -14,6 +14,7 @@ class SimulationResult:
     energy_breakdown: Dict[str, float]
     area_breakdown: Dict[str, float] = field(default_factory=dict)
     power_breakdown: Dict[str, float] = field(default_factory=dict)
+    mapping_text: Optional[str] = None
     area_mm2: Optional[float] = None
     tops: Optional[float] = None
     tops_per_w: Optional[float] = None
@@ -89,6 +90,7 @@ class SimulationResult:
             energy_breakdown=energy_breakdown,
             area_breakdown=area_breakdown,
             power_breakdown=power_breakdown,
+            mapping_text=getattr(stats, "mapping", None),
             source=source,
             metadata=dict(metadata or {}),
         )

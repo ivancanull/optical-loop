@@ -3,9 +3,8 @@
 from dataclasses import dataclass
 from typing import Optional
 
-from opticalloop.backend import TimeloopBackend
+from opticalloop.backend import TimeloopArchitectureConfig, TimeloopBackend
 from opticalloop.cache import TimeloopResultCache
-from opticalloop.config.architecture import MRRMacroConfig
 from opticalloop.config.workload import TimeloopLayerRef
 from opticalloop.result import SimulationResult
 
@@ -15,7 +14,7 @@ class LayerSimulator:
     """Return Timeloop-backed result data for one workload layer."""
 
     layer: TimeloopLayerRef
-    architecture: MRRMacroConfig
+    architecture: TimeloopArchitectureConfig
     backend: Optional[TimeloopBackend] = None
     cache: Optional[TimeloopResultCache] = None
     prefer_cache: bool = True

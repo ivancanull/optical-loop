@@ -1,0 +1,63 @@
+schema_version: 1
+name: dac26-rosa-edp
+scope: edp-only
+technology_nm: 45
+frequency_hz: 5000000000
+quantization_bits: 8
+system: fetch_all_lpddr4
+workloads:
+  alexnet: {layer_glob: "workspace/models/workloads/alexnet/*.yaml", expected_layers: 8}
+  vgg16: {layer_glob: "workspace/models/workloads/vgg16/*.yaml", expected_layers: 16}
+  resnet18: {layer_glob: "workspace/models/workloads/resnet18/*.yaml", expected_layers: 21}
+  mobilenet_v3: {layer_glob: "workspace/models/workloads/mobilenet_v3/*.yaml", expected_layers: 64}
+  gpt2_medium: {layer_glob: "workspace/models/workloads/gpt2_medium/*.yaml", expected_layers: 145}
+  vision_transformer: {layer_glob: "workspace/models/workloads/vision_transformer/*.yaml", expected_layers: 98}
+variants:
+  no_osa: {macro: proposed_mrr, output_suffix: _1bit_input}
+  osa: {macro: proposed_mrr_optical_shift_add, output_suffix: _1bit_input_osa}
+architectures:
+  - {name: deap_high_channel, tiles: 1, pes: 1, cols: 9, rows: 113, candidate: false}
+  - {name: deap_wide_kernel, tiles: 1, pes: 1, cols: 100, rows: 12, candidate: false}
+  - {name: compact_4x4, tiles: 1, pes: 64, cols: 4, rows: 4, candidate: true}
+  - {name: c4_r8, tiles: 1, pes: 32, cols: 4, rows: 8, candidate: true}
+  - {name: c4_r16, tiles: 1, pes: 16, cols: 4, rows: 16, candidate: true}
+  - {name: c4_r32, tiles: 1, pes: 8, cols: 4, rows: 32, candidate: true}
+  - {name: c8_r4, tiles: 1, pes: 32, cols: 8, rows: 4, candidate: true}
+  - {name: paper_optimum_8x8, tiles: 1, pes: 16, cols: 8, rows: 8, candidate: true}
+  - {name: c8_r16, tiles: 1, pes: 8, cols: 8, rows: 16, candidate: true}
+  - {name: c8_r32, tiles: 1, pes: 4, cols: 8, rows: 32, candidate: true}
+constraints: {max_candidate_cols: 8, max_weight_mrrs: 1024}
+aggregation:
+  reproducible_metric: geometric_mean_network_edp
+  paper_metric: "M=(1-lambda)*G+lambda*W_max"
+  lambda: null
+baselines:
+  compact: compact_4x4
+  deap: deap_high_channel
+  optimized: paper_optimum_8x8
+paper_targets:
+  optimized_vs_compact_reduction: 0.26
+  optimized_vs_deap_reduction: 0.64
+  osa_reduction: 0.29
+  osa_optimized_ode_reduction: {value: 0.37, reproducible: false, reason: raw ODE configuration/data unavailable}
+  hybrid_edp_j_s:
+    reproducible: false
+    reason: paper table values are supplied without a complete accuracy-independent hybrid experiment definition
+    values:
+      alexnet: {weight_stationary: 0.210, hybrid: 0.204}
+      mobilenet_v3: {weight_stationary: 0.030, hybrid: 0.026}
+      resnet18: {weight_stationary: 1.531, hybrid: 1.493}
+      vgg16: {weight_stationary: 121.5, hybrid: 118.3}
+tolerances:
+  edp_relative: 1.0e-9
+  reference_relative: 0.02
+  paper_percentage_points: 0.02
+smoke:
+  architecture: paper_optimum_8x8
+  layers:
+    alexnet: "0"
+    vgg16: "00"
+    resnet18: "00"
+    mobilenet_v3: "00"
+    gpt2_medium: "000"
+    vision_transformer: "00"

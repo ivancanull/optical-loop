@@ -35,17 +35,18 @@ from opticalloop import (  # noqa: E402
     MRRMacroConfig,
     TimeloopBackend,
     TimeloopLayerRef,
+    TimeloopMacroConfig,
     TimeloopResultCache,
-)
-from opticalloop.applications.deap_cnns import (  # noqa: E402
-    DEAP_ARCHITECTURES,
-    DeapResultValidator,
-    default_deap_workflow,
-    write_deap_artifacts,
 )
 from opticalloop.applications.rosa import (  # noqa: E402
     FINAL_ARTIFACTS,
     RosaResultValidator,
+    PaperEDPConfig,
+    PaperEDPReproduction,
+    EnvironmentDoctor,
+    ExperimentManifest,
+    ReproductionAnalyzer,
+    ReproductionRunner,
     default_rosa_workflow,
     parse_architecture_argument,
     write_reference_artifacts,
@@ -54,6 +55,43 @@ from opticalloop.applications.rosa import (  # noqa: E402
 
 def _parse_networks(value: str) -> Sequence[str]:
     return tuple(part.strip() for part in value.split(",") if part.strip())
+
+
+def _parse_cli_value(value: str) -> object:
+    lowered = value.lower()
+    if lowered == "true":
+        return True
+    if lowered == "false":
+        return False
+    try:
+        return int(value)
+    except ValueError:
+        pass
+    try:
+        return float(value)
+    except ValueError:
+        return value
+
+
+def _parse_variable_assignments(assignments: Sequence[str]) -> dict[str, object]:
+    variables: dict[str, object] = {}
+    for assignment in assignments:
+        if "=" not in assignment:
+            raise SystemExit(f"--var must use KEY=VALUE syntax: {assignment!r}")
+        key, value = assignment.split("=", 1)
+        key = key.strip()
+        if not key:
+            raise SystemExit(f"--var key cannot be empty: {assignment!r}")
+        variables[key] = _parse_cli_value(value.strip())
+    return variables
+
+
+def _infer_network_from_workload(workload: str) -> str:
+    if "/" not in workload:
+        raise SystemExit(
+            "--network is required when --workload does not include a network prefix"
+        )
+    return workload.split("/", 1)[0]
 
 
 def _repo_root() -> Path:
@@ -157,65 +195,6 @@ def _write_validation_report(results_dir: Path, report_path: Path) -> None:
     print(f"Validation passed ({len(report)} checks); wrote {report_path.as_posix()}")
 
 
-def _print_deap_report(report) -> None:
-    print("OpticalLoop DEAP-CNNs report")
-    print(
-        "Architecture: "
-        f"{report['name']} {report['architecture']} "
-        f"kernel={report['kernel_edge']}x{report['kernel_edge']} "
-        f"channels={report['input_channels']}"
-    )
-    print(
-        "Device: "
-        f"{report['device_precision_bits']}-bit MRR control, "
-        f"{report['output_cycle_ps']} ps output cycle"
-    )
-
-
-def _write_deap_validation_report(artifact_dir: Path, report_path: Path) -> None:
-    validator = DeapResultValidator(artifact_dir)
-    report = validator.validate()
-    report_path.parent.mkdir(parents=True, exist_ok=True)
-    report.to_csv(report_path, index=False)
-    failed = report[~report["passed"]]
-    if not failed.empty:
-        raise SystemExit(
-            "Validation failed; see "
-            f"{report_path.as_posix()} for {len(failed)} failing checks"
-        )
-    print(f"Validation passed ({len(report)} checks); wrote {report_path.as_posix()}")
-
-
-def _run_deap(args) -> None:
-    workflow = default_deap_workflow(
-        architecture_name=args.architecture,
-        results_dir=args.results_dir,
-        n_jobs=args.n_jobs,
-    )
-
-    if args.mode == "cache" and args.stage == "run":
-        raise SystemExit("cache mode cannot run live Timeloop stages; use --mode rerun")
-
-    if args.stage in {"run", "all"} and args.mode == "rerun":
-        workflow.run_sweeps()
-
-    if args.stage in {"aggregate", "all"}:
-        workflow.reconstruct_and_aggregate()
-
-    if args.stage in {"artifacts", "all"}:
-        outputs = write_deap_artifacts(args.artifact_dir)
-        print(f"Wrote DEAP-CNNs artifacts: {len(outputs)} files")
-
-    if args.stage in {"validate", "all"}:
-        report_path = args.validation_report or (
-            args.artifact_dir / "validation_report.csv"
-        )
-        _write_deap_validation_report(args.artifact_dir, report_path)
-
-    if args.stage in {"report", "all"}:
-        _print_deap_report(workflow.report())
-
-
 def _run_rosa(args) -> None:
     workflow = default_rosa_workflow(
         results_dir=args.results_dir,
@@ -225,6 +204,24 @@ def _run_rosa(args) -> None:
 
     if args.mode == "cache" and args.stage in {"run", "hybrid"}:
         raise SystemExit("cache mode cannot run live Timeloop stages; use --mode rerun")
+
+    if args.stage in {"paper-edp", "all"}:
+        reproduction = PaperEDPReproduction(
+            PaperEDPConfig(data_dir=args.paper_edp_data_dir)
+        )
+        summary = reproduction.headline_summary()
+        print("DAC26 EDP-only reproduction (committed Timeloop aggregates)")
+        print(f"No-OSA winner: {summary['best_no_osa']}")
+        print(
+            "Optimized reduction vs compact / DEAP: "
+            f"{summary['optimized_vs_compact_reduction']:.1%} / "
+            f"{summary['optimized_vs_deap_reduction']:.1%}"
+        )
+        print(
+            "OSA reduction at optimized shape: "
+            f"{summary['osa_reduction_at_optimized_shape']:.1%}"
+        )
+        print("Paper targets: 26% / 64% / 29% (37% with optimized ODE)")
 
     if args.stage in {"run", "all"} and args.mode == "rerun":
         workflow.run_sweeps()
@@ -280,20 +277,45 @@ def _run_rosa(args) -> None:
 
 
 def _run_layer(args) -> None:
-    architecture = MRRMacroConfig(
-        n_tiles=args.tiles,
-        n_pes=args.pes,
-        n_cols=args.cols,
-        n_rows=args.rows,
-        macro=args.macro,
-        system=args.system,
-        voltage_dac_resolution=args.voltage_dac_resolution,
-        scaling=args.scaling,
-        max_utilization=args.max_utilization,
+    variables = _parse_variable_assignments(args.var or ())
+    workload = args.workload or args.layer
+    if workload is None:
+        raise SystemExit("Provide --workload, or legacy --layer with --network")
+    network = args.network or _infer_network_from_workload(workload)
+
+    uses_mrr_shape = all(
+        value is not None for value in (args.tiles, args.pes, args.cols, args.rows)
     )
-    layer = TimeloopLayerRef(network=args.network, layer_path=args.layer)
+    if uses_mrr_shape and not variables:
+        architecture = MRRMacroConfig(
+            n_tiles=args.tiles,
+            n_pes=args.pes,
+            n_cols=args.cols,
+            n_rows=args.rows,
+            macro=args.arch,
+            system=args.system,
+            voltage_dac_resolution=args.voltage_dac_resolution,
+            scaling=args.scaling,
+            max_utilization=args.max_utilization,
+        )
+    else:
+        if any(value is not None for value in (args.tiles, args.pes, args.cols, args.rows)):
+            raise SystemExit(
+                "Use either --var for a generic macro or all MRR shape options "
+                "without --var; do not mix the two forms."
+            )
+        architecture = TimeloopMacroConfig(
+            macro=args.arch,
+            variables=variables,
+            system=args.system,
+            max_utilization=args.max_utilization,
+        )
+
+    layer = TimeloopLayerRef(network=network, layer_path=workload)
     cache = None
     if args.cache_results_dir is not None:
+        if not isinstance(architecture, MRRMacroConfig):
+            raise SystemExit("--cache-results-dir is only supported for MRR shape runs")
         cache = TimeloopResultCache(
             results_dir=args.cache_results_dir,
             save_name=args.cache_save_name,
@@ -308,7 +330,7 @@ def _run_layer(args) -> None:
 
     print("OpticalLoop Timeloop-backed layer result")
     print(f"Source:       {result.source}")
-    print(f"Layer:        {layer.layer_path}")
+    print(f"Workload:     {layer.layer_path}")
     print(f"Architecture: {architecture.architecture_key}")
     print(f"Macro:        {architecture.macro}")
     print(f"Cycles:       {result.cycles}")
@@ -318,6 +340,45 @@ def _run_layer(args) -> None:
         print(f"Area:         {result.area_mm2:.6e} mm^2")
     if result.tops_per_w is not None:
         print(f"TOPS/W:       {result.tops_per_w:.6f}")
+    if args.show_mapping:
+        print("Mapping:")
+        print(result.mapping_text or "<no Timeloop mapping text available>")
+
+
+def _run_reproduce(args) -> None:
+    manifest = ExperimentManifest(args.manifest, repo_root=_repo_root())
+    doctor = EnvironmentDoctor(manifest)
+    if args.action == "doctor":
+        report = doctor.check()
+        print(report.to_string(index=False))
+        if (report["status"] == "FAIL").any():
+            raise SystemExit(2)
+        return
+
+    if args.action in {"smoke", "full"}:
+        preflight = doctor.check()
+        failed = preflight[preflight["status"] == "FAIL"]
+        if not failed.empty:
+            print(failed.to_string(index=False))
+            raise SystemExit("Environment doctor failed; simulation was not started")
+        run_dir = ReproductionRunner(manifest, args.run_root).run(
+            args.action, resume=not args.no_resume, fail_fast=args.fail_fast,
+            workers=args.workers,
+        )
+    else:
+        if args.run_dir is None:
+            raise SystemExit(f"reproduce {args.action} requires --run-dir")
+        run_dir = args.run_dir
+
+    artifacts = ReproductionAnalyzer(manifest, run_dir).analyze(
+        execute_notebook=not args.skip_notebook
+    )
+    print(f"Run directory: {Path(run_dir).resolve()}")
+    for name, path in artifacts.items():
+        print(f"{name}: {path}")
+    validation = pd.read_csv(artifacts["validation.csv"])
+    if ((validation["severity"] == "ERROR") & (validation["status"] == "FAIL")).any():
+        raise SystemExit(1)
 
 
 def _add_rosa_parser(subparsers) -> None:
@@ -336,12 +397,19 @@ def _add_rosa_parser(subparsers) -> None:
             "hybrid",
             "validate",
             "artifacts",
+            "paper-edp",
             "all",
         ),
         default="report",
     )
     parser.add_argument("--preset", choices=("rosa-full",), default="rosa-full")
     parser.add_argument("--results-dir", type=Path, default=Path("results"))
+    parser.add_argument(
+        "--paper-edp-data-dir",
+        type=Path,
+        default=Path("examples/rosa/paper_edp_data"),
+        help="Committed six-workload no-OSA/OSA Timeloop aggregate directory.",
+    )
     parser.add_argument(
         "--networks",
         type=str,
@@ -389,54 +457,74 @@ def _add_rosa_parser(subparsers) -> None:
     parser.set_defaults(func=_run_rosa)
 
 
-def _add_deap_parser(subparsers) -> None:
-    parser = subparsers.add_parser(
-        "deap-cnns",
-        help="Run the DEAP-CNNs application workflow.",
-    )
-    parser.add_argument("--mode", choices=("cache", "rerun"), default="cache")
-    parser.add_argument(
-        "--stage",
-        choices=("report", "run", "aggregate", "validate", "artifacts", "all"),
-        default="report",
-    )
-    parser.add_argument(
-        "--architecture",
-        choices=tuple(DEAP_ARCHITECTURES.keys()),
-        default="mnist-default",
-    )
-    parser.add_argument("--results-dir", type=Path, default=Path("results"))
-    parser.add_argument("--artifact-dir", type=Path, default=Path("examples/deap_cnns"))
-    parser.add_argument("--n-jobs", type=int, default=1)
-    parser.add_argument(
-        "--validation-report",
-        type=Path,
-        default=None,
-        help="Validation report path. Defaults to <artifact-dir>/validation_report.csv.",
-    )
-    parser.set_defaults(func=_run_deap)
-
-
 def _add_layer_parser(subparsers) -> None:
     parser = subparsers.add_parser(
         "layer",
         help="Run one Timeloop-backed layer simulation.",
     )
-    parser.add_argument("--network", required=True)
-    parser.add_argument("--layer", required=True)
-    parser.add_argument("--macro", default="proposed_mrr_optical_shift_add")
+    parser.add_argument(
+        "--arch",
+        "--macro",
+        dest="arch",
+        default="proposed_mrr_optical_shift_add",
+        help="Timeloop macro/architecture name.",
+    )
+    parser.add_argument(
+        "--workload",
+        default=None,
+        help="Timeloop workload path such as alexnet/0 or deap_deepbench/bench0.",
+    )
+    parser.add_argument(
+        "--network",
+        default=None,
+        help="Optional network label. Inferred from --workload when possible.",
+    )
+    parser.add_argument(
+        "--layer",
+        default=None,
+        help="Legacy alias for --workload when using MRR shape options.",
+    )
+    parser.add_argument(
+        "--var",
+        action="append",
+        default=[],
+        help="Timeloop variable override in KEY=VALUE form. Repeat as needed.",
+    )
     parser.add_argument("--system", default="fetch_all_lpddr4")
-    parser.add_argument("--tiles", type=int, required=True)
-    parser.add_argument("--pes", type=int, required=True)
-    parser.add_argument("--cols", type=int, required=True)
-    parser.add_argument("--rows", type=int, required=True)
+    parser.add_argument("--tiles", type=int, default=None)
+    parser.add_argument("--pes", type=int, default=None)
+    parser.add_argument("--cols", type=int, default=None)
+    parser.add_argument("--rows", type=int, default=None)
     parser.add_argument("--voltage-dac-resolution", type=int, default=1)
     parser.add_argument("--scaling", default='"aggressive"')
     parser.add_argument("--max-utilization", action="store_true")
+    parser.add_argument(
+        "--show-mapping",
+        action="store_true",
+        help="Print Timeloop mapper loop text when available.",
+    )
     parser.add_argument("--cache-results-dir", type=Path, default=None)
     parser.add_argument("--cache-save-name", default="deapcnns")
     parser.add_argument("--cache-output-postfix", default="_1bit_input_osa")
     parser.set_defaults(func=_run_layer)
+
+
+def _add_reproduce_parser(subparsers) -> None:
+    parser = subparsers.add_parser(
+        "reproduce", help="Run and verify the clean-checkout DAC26 EDP experiment."
+    )
+    parser.add_argument("action", choices=("doctor", "smoke", "full", "analyze", "validate"))
+    parser.add_argument(
+        "--manifest", type=Path,
+        default=Path("examples/rosa/dac26_edp_manifest.yaml"),
+    )
+    parser.add_argument("--run-root", type=Path, default=Path("reproduction-runs"))
+    parser.add_argument("--run-dir", type=Path, default=None)
+    parser.add_argument("--no-resume", action="store_true")
+    parser.add_argument("--fail-fast", action="store_true")
+    parser.add_argument("--workers", type=int, default=4)
+    parser.add_argument("--skip-notebook", action="store_true")
+    parser.set_defaults(func=_run_reproduce)
 
 
 def main() -> None:
@@ -445,8 +533,8 @@ def main() -> None:
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
     _add_layer_parser(subparsers)
-    _add_deap_parser(subparsers)
     _add_rosa_parser(subparsers)
+    _add_reproduce_parser(subparsers)
     args = parser.parse_args()
     args.func(args)
 

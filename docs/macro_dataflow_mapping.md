@@ -140,20 +140,44 @@ False -> proposed_mrr_1bit_input_delay_line
 True  -> proposed_mrr_1bit_input_delay_line_wi
 ```
 
-## DEAP-CNNs Macro
+## DEAP-CNNs Notebook Macro
 
-`deap_cnns` is a separate application macro. It reuses the regular MRR-style
-placement pattern but changes the device and application assumptions:
+DEAP-CNNs is a notebook example that uses one canonical macro, `deap_cnns`.
+It follows the same core row/column input-sharing logic as `proposed_mrr`,
+with DEAP-CNNs names and device models, and is run through the generic
+`layer --arch --workload --var` interface:
 
-- default shape is `T1, P1, C25, R8`;
-- precision is 7-bit;
-- the ADC count is `N_ADC_PER_BANK=1`;
-- the default workload is `deap_mnist/conv0` and `deap_mnist/conv1`;
-- device constants are stored in `applications/deap_cnns/workflow.py` and
-  mirrored in `workspace/models/arch/1_macro/deap_cnns/variables_iso.yaml`.
+- `N_COLUMNS`, the wavelength-column count in one convolutional unit;
+- `N_ROWS = D`, the fixed physical channel-line / weight-bank capacity;
+- `N_Conv = nconv`, the number of parallel convolved output pixels;
+- `conv_unit` spatially maps `P,Q` and then `N`;
+- `laser`, `dac`, and `input_mrr` sit before the row/column crossing and have
+  `N_COLUMNS` physical instances per convolution unit;
+- `channel_weight_row` spatially maps only `C`; input-side sharing is expressed
+  by placing the input components above this fanout, because Timeloop cannot map
+  `C` while also applying the stronger `spatial_must_reuse_inputs` anchor;
+- `wavelength_column` spatially maps `R,S` and uses `spatial_must_reuse_outputs`;
+- `M/K` output filters are not mapped spatially and remain a sequential loop.
 
-Do not mix `deap_cnns` with ROSA result postfixes; it has its own
-`examples/deap_cnns/` artifacts.
+The notebook runs two settings:
+`R=10,D=12` on `deap_deepbench/bench0`, so `N_COLUMNS=100` and `N_ROWS=12`;
+`R=3,D=113` on `deap_deepbench/bench1`, so `N_COLUMNS=9` and `N_ROWS=113`.
+
+The component placement follows the DEAP unit accounting:
+
+| Component | Hardware count / role |
+| --- | --- |
+| `laser` | one source per wavelength column, i.e. `N_COLUMNS` per convolution unit, shared across channel rows |
+| `dac` | one Wang-style R-2R DAC per wavelength column; raw component output is reported as-is |
+| `input_mrr` | one input modulator MRR per wavelength column, placed before row fanout so rows share it |
+| `weight_mrr` | one optical weight-bank crossing per `wavelength_column` x `channel_weight_row` site, i.e. `N_COLUMNS*D` |
+| `TIA` and `photodiode_output_readout` | `D` readout lines per convolution unit, represented as `N_Conv * D` physical instances |
+| `adc` | one column-readout ADC per convolution unit, represented as `N_Conv` physical instances |
+
+Weights are treated as configured optical MRR states, so there is no separate
+per-convolution weight-DAC action path. The notebook displays raw Timeloop
+component rows and mapper loop text; it does not use a DEAP-specific workflow
+or calibrated post-processing path.
 
 ## Reproduction Checklist
 
@@ -162,7 +186,7 @@ When reproducing a CSV, record these fields together:
 | Field | Why it matters |
 | --- | --- |
 | `macro` | Selects the architecture/dataflow template. |
-| `N_TILES`, `N_PES`, `N_COLUMNS`, `N_ROWS` | Defines the macro array shape reported as `T/P/C/R`. |
+| `N_TILES`, `N_PES` or `N_Conv`, `N_COLUMNS`, `N_ROWS` | Defines the macro array shape or explicit generic Timeloop variables. |
 | `VOLTAGE_DAC_RESOLUTION` | Distinguishes 1-bit input sweeps from higher-resolution input paths. |
 | `system` | Selects the memory wrapper, usually `fetch_all_lpddr4`. |
 | `max_utilization` | Changes mapper constraints when enabled. ROSA cached workflows use `False`. |

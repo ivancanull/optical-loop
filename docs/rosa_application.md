@@ -4,6 +4,33 @@ ROSA is the first OpticalLoop application preset. It provides an included archit
 
 The application covers MRR-ONN architecture sweeps, no-OSA versus OSA comparison, six-network OSA ranking, and layer-wise hybrid mapping support. It does not include separate PyTorch DAC/thermal noise or CIFAR-10 accuracy simulations.
 
+## DAC26 EDP Experiment Definition
+
+The paper-facing, accuracy-free reproduction is
+`examples/rosa/dac26_edp_reproduction.ipynb`. Its machine-readable settings are
+in `examples/rosa/paper_edp_config.yaml`, and the twelve committed CSVs under
+`examples/rosa/paper_edp_data/` contain no-OSA and OSA Timeloop aggregates for
+the six paper workloads.
+
+The sweep compares the two DEAP-CNNs shapes (9x113 and 100x12), compact 4x4,
+and seven equal-budget shapes through 8x32. It uses 45 nm component models,
+5 GHz operation, and 8-bit quantization. Per-network EDP is energy in joules
+times latency in seconds.
+
+Run the cached, deterministic report with:
+
+```bash
+conda run -n timeloop python optical_loop.py rosa --stage paper-edp
+```
+
+The committed aggregates select 8x8 without OSA. Their direct geometric-mean
+reductions are 27.8% versus 4x4, 44.5% versus 9x113, and 31.4% for OSA at 8x8.
+The TeX publishes 26%, 64%, and 29% (37% with optimized ODE). The difference is
+kept visible because the paper does not state the lambda used in its robust
+aggregate and no separate optimized-ODE raw dataset was supplied. Consequently,
+the 8x8 selection is reproduced exactly, while the percentages are an honest
+near-alignment rather than falsely claimed bit-for-bit reproduction.
+
 ## What ROSA Runs Here
 
 | Result area | Artifact support |

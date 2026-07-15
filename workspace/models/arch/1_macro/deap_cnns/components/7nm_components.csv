@@ -6,8 +6,8 @@ technology,scaling,resolution,action,energy,area,global_cycle_seconds,comment
 7nm,moderate,8,write|update|leak,0,2769,1
 7nm,aggressive,8,convert|read,0.0375,2769,1,energy in pJ;  area in um^2
 7nm,aggressive,8,write|update|leak,0,2769,1
-7nm,deapcnns,7,convert|read,3.4,2769,1,DEAP-CNNs TIA power 17 mW at 200 ps; area proxy from existing component library
-7nm,deapcnns,7,write|update|leak,0,2769,1
+7nm,deapcnns,7,convert|read|write|update,0,2769,1,DEAP-CNNs TIA dynamic action energy omitted; device power is encoded as leak
+7nm,deapcnns,7,leak,17e9,2769,1,DEAP-CNNs TIA physical power 17 mW encoded directly as pJ/s
 
 COMPONENT: awg
 technology,resolution,action,energy,area,global_cycle_seconds,comment
@@ -22,8 +22,8 @@ technology,scaling,resolution,action,energy,area,global_cycle_seconds,comment
 7nm,moderate,8,write|update|leak,0,800,1
 7nm,aggressive,8,convert|read,0.075,800,1,energy in pJ;  area in um^2
 7nm,aggressive,8,write|update|leak,0,800,1
-7nm,deapcnns,7,convert|read,3.4,800,1,DEAP-CNNs TIA power 17 mW at 200 ps; area proxy from existing component library
-7nm,deapcnns,7,write|update|leak,0,800,1
+7nm,deapcnns,7,convert|read|write|update,0,800,1,DEAP-CNNs TIA dynamic action energy omitted; device power is encoded as leak
+7nm,deapcnns,7,leak,17e9,800,1,DEAP-CNNs TIA physical power 17 mW encoded directly as pJ/s
 
 COMPONENT: dac_cache
 technology,scaling,resolution,action,energy,area,global_cycle_seconds,comment
@@ -37,6 +37,11 @@ technology,scaling,resolution,action,energy,area,global_cycle_seconds,comment
 7nm,aggressive,1,convert|read|leak,0,3750,1
 7nm,deapcnns,7,write|update,5.2,400000,1,DEAP-CNNs DAC power 26 mW at 200 ps; area proxy from existing component library
 7nm,deapcnns,7,convert|read|leak,0,400000,1
+
+COMPONENT: deap_adc
+technology,scaling,resolution,action,energy,area,global_cycle_seconds,comment
+7nm,deapcnns,7,compute|convert|read|write|update,0,498400,1,DEAP-CNNs column-readout ADC dynamic energy is encoded as zero
+7nm,deapcnns,7,leak,76e9,498400,1,DEAP-CNNs column-readout ADC physical power 76 mW encoded directly as pJ/s
 
 COMPONENT: mrr
 technology,scaling,resolution,action,energy,area,global_cycle_seconds,comment
@@ -128,7 +133,3 @@ technology,scaling,resolution,action,energy,area,global_cycle_seconds,comment
 7nm,aggressive,8,leak|write|update,0,64.5,1
 7nm,deapcnns,7,convert|read,0.05,64.5,1,balanced photodiode energy proxy from existing component library
 7nm,deapcnns,7,leak|write|update,0,64.5,1
-
-
-reference: {'MRR': 996800.0, 'ADC': 498400.0, 'DAC': 37380.0, 'Cache': 249200.0, 'Photodiode': 249200.0, 'TIA': 124600.0, 'MZM': 4610200.0}
-model: {'MRR': 996300.0, 'ADC': 498746.679723, 'DAC': 37332.0, 'Cache': 78359.375, 'Photodiode': 0, 'TIA': 124605.0, 'MZM': 4610196.0}

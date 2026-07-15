@@ -26,13 +26,13 @@ Application workflows can use `workflow/results.py` to write:
 | `examples/rosa/plots/alexnet_osa_edp_comparison.png` | AlexNet no-OSA vs OSA EDP comparison. |
 | `examples/rosa/plots/six_network_osa_ranking.png` | Six-network OSA aggregate score ranking. |
 
-## Committed DEAP-CNNs Artifacts
+## DEAP-CNNs Example
 
-| File | Meaning |
-| --- | --- |
-| `examples/deap_cnns/device_parameters_deap_cnns.csv` | Device constants extracted from the DEAP-CNNs article and used by the application. |
-| `examples/deap_cnns/architecture_summary_deap_cnns.csv` | Supported DEAP-CNNs architecture presets and derived wavelength/modulator counts. |
-| `examples/deap_cnns/validation_report.csv` | Validation report for device constants, architecture constraints, tracked-reference checks, and path portability. |
+`examples/deap_cnns/deap_cnns_reproduction.ipynb` is a notebook example that runs two `deap_cnns` macro/workload cases through the generic backend. It displays raw Timeloop metrics, per-component rows, simple device-count sanity checks, and mapper loop text.
+
+No DEAP-CNNs CSV artifact set is committed. Generated full Timeloop outputs remain under ignored runtime output directories.
+
+For convenience, `docs/deap_cnns_timeloop_data.md` records the current raw Timeloop layer summaries, non-zero component breakdown rows, and mapper loop text for the two notebook cases. This is documentation data, not a separate DEAP workflow artifact.
 
 ## ROSA Validation Formula
 

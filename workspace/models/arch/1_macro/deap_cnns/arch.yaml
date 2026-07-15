@@ -2,143 +2,120 @@
 mapper:
   diagnostics: True
 architecture:
-  # ======================= Top level is !Hierarchical =======================
+  # Canonical DEAP-CNNs dataflow:
+  # - N_COLUMNS = R*S wavelength columns in one convolution unit.
+  # - Per-column shared input modulation: laser, DAC, and input MRR.
+  # - Per-column, per-channel weight bank: N_COLUMNS * N_ROWS weight MRRs.
+  # - N_ROWS = D channel lines / optical weight-bank lines.
+  # - N_Conv = nconv parallel convolution units for output pixels.
+  # - M/K filters stay temporal; output channels are not spatially mapped.
   nodes: &chip
-  - !Container # Top-level system
+  - !Container
     name: chip
     <<<: [*container_defaults]
     attributes: {has_power_gating: True}
 
-  - !Component # DRAM main memory
+  - !Component
     name: glb
     <<<: [*component_defaults]
     subclass: sram
     attributes:
       width: 2048
-      depth: 1024 * 256 * 8 // width # 256KB
+      depth: 1024 * 256 * 8 // width
     constraints:
       dataspace: {keep_only: [Inputs, Outputs]}
       temporal:
+        # Filters/output channels are intentionally handled sequentially.
         factors: !nomerge [Q=0, M=-1, C=-1, X=1]
         permutation: [N, M, C, Q, P]
         no_iteration_over_dataspaces: !nomerge []
 
-  - !Container # Macro
-    name: tile # long name so it doesn't conflict with other names
-    <<<: [*container_defaults, *spatial_map_all_weights]
+  - !Container
+    name: tile
+    <<<: [*container_defaults, *spatial_must_reuse_weights]
     attributes: {has_power_gating: True}
     spatial: {meshX: N_TILES}
+    constraints:
+      spatial:
+        maximize_dims: [[P, Q], [N]]
+        split: 999
 
-  # - !Component # Input buffer
-  #   name: input_buffer
-  #   <<<: [*component_defaults]
-  #   subclass: sram
-  #   attributes:
-  #     n_macros: N_PES
-  #     width: N_PES * SUPPORTED_INPUT_BITS
-  #     depth: ARRAY_PARALLEL_INPUTS * SUPPORTED_INPUT_BITS * N_PES // width
-  #     multiple_buffering: 1 / CIM_UNIT_DEPTH_CELLS
-  #   constraints: {dataspace: {keep_only: [Inputs]}, temporal: {factors_only: []}}
-  #   enabled: True
-
-  - !Component # Output buffer
+  - !Component
     name: output_buffer
     <<<: [*component_defaults]
     subclass: sram
     attributes:
-      n_macros: N_PES
-      width: N_PES * SUPPORTED_OUTPUT_BITS
-      depth: ARRAY_PARALLEL_OUTPUTS * SUPPORTED_OUTPUT_BITS * N_PES // width
+      n_macros: N_Conv
+      width: N_Conv * SUPPORTED_OUTPUT_BITS
+      depth: ARRAY_PARALLEL_OUTPUTS * SUPPORTED_OUTPUT_BITS * N_Conv // width
       multiple_buffering: 1 / CIM_UNIT_DEPTH_CELLS
     constraints: {dataspace: {keep_only: [Outputs]}, temporal: {factors_only: []}}
     enabled: True
 
-  - !Container # Macro
-    name: photonic_pe # long name so it doesn't conflict with other names
-    <<<: [*container_defaults, *spatial_map_all_weights]
+  - !Container
+    name: conv_unit
+    <<<: [*container_defaults, *spatial_must_reuse_weights]
     attributes: {has_power_gating: True}
-    spatial: {meshX: N_PES}
-
-  - !Component # Weight cache stores weights
-    name: weight_dac
-    <<<: [*component_defaults, *keep_weights]
-    subclass: dac_cache
-    attributes:
-      depth: WEIGHT_BITS_PER_SLICE
-      width: N_ROWS * N_COLUMNS # One laser per wavelength
-      n_instances: N_COLUMNS
+    spatial: {meshX: N_Conv}
     constraints:
-      temporal:
-        factors_only: [N=-1]
-        factors: []
-        no_iteration_over_dataspaces: !nomerge [] # Overwrite default
+      spatial:
+        maximize_dims: [[P, Q], [N]]
+        split: 999
 
-  # - !Component # Weight cache stores weights
-  #   name: weight_cache
-  #   <<<: [*component_defaults, *keep_weights]
-  #   subclass: sram
-  #   attributes:
-  #     depth: ENCODED_WEIGHT_BITS
-  #     width: N_ROWS * N_COLUMNS   # To ensure that we can run weight-stationary
-  #   constraints:
-  #     temporal:
-  #       factors_only: [M=-1]
-  #       factors: []
-  #       no_iteration_over_dataspaces: !nomerge [] # Overwrite default
-
-  # - !Component # Weight cache stores weights
-  #   name: input_cache
-  #   <<<: [*component_defaults, *keep_inputs]
-  #   subclass: sram
-  #   attributes:
-  #     depth: N_COLUMNS
-  #     width: ENCODED_INPUT_BITS
-  #   constraints:
-  #     temporal:
-  #       factors_only: [M=-1]
-  #       factors: []
-  #       no_iteration_over_dataspaces: !nomerge [] # Overwrite default
-
-  - !Component # ADC
-    name: adc
-    <<<: [*component_defaults, *keep_outputs, *no_coalesce]
-    subclass: adc
-    attributes: {<<<: *cim_component_attributes}
-
-  - !Component # TIA converts analog current to voltage for ADC
+  # D channel readout lines per conv_unit. Total TIA = N_Conv * N_ROWS.
+  - !Component
     name: TIA
     <<<: [*component_defaults, *keep_outputs, *no_coalesce]
     subclass: tia
     attributes:
-      depth: ENCODED_OUTPUT_BITS
-      width: N_ROWS
+      depth: INF
+      width: 1
       n_instances: N_ROWS
 
-  - !Component # Photodiode converts output light to analog current
+  # D photodiode readout lines per conv_unit. Total photodiodes = N_Conv * N_ROWS.
+  - !Component
     name: photodiode_output_readout
     <<<: [*component_defaults, *keep_outputs, *no_coalesce]
     subclass: photodiode
     attributes:
-      depth: ENCODED_OUTPUT_BITS
-      width: N_ROWS
+      depth: INF
+      width: 1
       n_instances: N_ROWS
 
-  - !Component # Put laser down here -> power is proportional to the number of endpoints
+  # One ADC per conv_unit. Total ADC = N_Conv.
+  - !Component
+    name: adc
+    <<<: [*component_defaults, *keep_outputs, *no_coalesce]
+    subclass: deap_adc
+    attributes:
+      <<<: *cim_component_attributes
+      width: 1
+      resolution: SUPPORTED_OUTPUT_BITS
+      n_instances: 1
+
+  # Input-side modulation shared by all channel rows.
+  # Total laser/DAC/input_mrr = N_Conv * N_COLUMNS.
+  - !Component
     name: laser
     <<<: [*component_defaults, *keep_inputs, *no_coalesce]
     subclass: laser
     attributes:
-      depth: INPUT_BITS_PER_SLICE
-      width: N_COLUMNS # One laser per wavelength
+      depth: INF
+      width: N_COLUMNS
       n_instances: N_COLUMNS
 
-  - !Component # DAC supplies analog weight values
-    name: input_dac
+  - !Component
+    name: dac
     <<<: [*component_defaults, *keep_inputs, *no_coalesce]
-    subclass: dac_cache
+    subclass: dac_r2r_ladder_compound
     attributes:
-      depth: INPUT_BITS_PER_SLICE
-      width: N_COLUMNS # One laser per wavelength
+      width: 1
+      resolution: DAC_RESOLUTION
+      unit_resistance: DAC_UNIT_RESISTANCE
+      zero_between_values: 0
+      bit_distribution: INPUT_BIT_DISTRIBUTION
+      hist: hist_to_magnitude(INPUTS_HIST)
+      voltage: VOLTAGE / 2
       n_instances: N_COLUMNS
 
   - !Component
@@ -146,32 +123,43 @@ architecture:
     <<<: [*component_defaults, *keep_inputs, *no_coalesce]
     subclass: tomrr
     attributes:
-      depth: INPUT_BITS_PER_SLICE
-      width: N_COLUMNS # One laser per wavelength
+      depth: INF
+      width: N_COLUMNS
       n_instances: N_COLUMNS
 
-  - !ArrayContainer # Each row works on a different column of the filter weights
-    name: row
-    <<<: [*container_defaults, *spatial_must_reuse_inputs]
+  # Channel rows reuse the input-side optical signal.
+  # Total weight_mrr = N_Conv * N_COLUMNS * N_ROWS.
+  - !ArrayContainer
+    name: channel_weight_row
+    <<<: [*container_defaults]
     spatial: {meshY: N_ROWS}
-    constraints: {spatial: {maximize_dims: [[Y], [M]]}}
-    max_utilization: {spatial: {factors: [('M=' + str(row.get_fanout()))]}}
+    constraints:
+      spatial:
+        # `spatial_must_reuse_inputs` cannot be used here because C is an
+        # Inputs dimension. The hierarchy still shares the input-side MRRs
+        # across rows by placing them above this spatial fanout.
+        no_reuse: [Outputs, Weights]
+        factors: [N=1, M=1, P=1, Q=1, R=1, S=1, X=1]
+        maximize_dims: [[C]]
+        split: 999
 
-  - !ArrayContainer # Each column stores a different weight slice. Columns share inputs.
-    name: column
+  # Wavelength columns map kernel positions at each channel row.
+  - !ArrayContainer
+    name: wavelength_column
     <<<: [*container_defaults, *spatial_must_reuse_outputs]
     spatial: {meshX: N_COLUMNS}
     constraints:
       spatial:
-        maximize_dims: [[R, S], [C]]
-        # no_iteration_over_dataspaces: [Weights]
-    max_utilization: {spatial: {factors: [('R=' + str(column.get_fanout()))]}}
+        maximize_dims: [[R, S]]
+        split: 999
 
-  - !Component # A MRR in each row/column crossing grabs one wavelength of input/weight multiplied light to send to an output
+  - !Component
     name: weight_mrr
     subclass: tomrr
     <<<: [*component_defaults, *keep_inputs, *keep_weights, *no_temporal_reuse]
-    attributes: {width: WEIGHT_BITS_PER_SLICE, n_instances: 1}
+    attributes:
+      width: 1
+      n_instances: 1
 
-  - !Hierarchical           # Virtualize an XxYxZ-bit MAC as multiple MAC units.
-    nodes: *virtualized_mac # Defined in include/defines.yaml.
+  - !Hierarchical
+    nodes: *virtualized_mac

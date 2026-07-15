@@ -1,0 +1,12 @@
+services:
+  opticalloop:
+    build:
+      context: .
+    image: opticalloop-dac26:local
+    working_dir: /work/optical-loop
+    user: "${UID:-1000}:${GID:-1000}"
+    environment:
+      HOME: /tmp/opticalloop-home
+    volumes:
+      - .:/work/optical-loop
+    command: ["python3", "optical_loop.py", "reproduce", "doctor"]

@@ -1,5 +1,5 @@
 from opticalloop.backend import TimeloopBackend, TimeloopRun
-from opticalloop.config.architecture import MRRMacroConfig
+from opticalloop.config.architecture import MRRMacroConfig, TimeloopMacroConfig
 from opticalloop.config.workload import TimeloopLayerRef
 
 
@@ -16,6 +16,7 @@ class FakeStats:
     per_component_energy = {"adc": 1e-6}
     per_component_area = {"adc": 2e-3}
     per_component_power = {"adc": 3.0}
+    mapping = "for P in [0:1)\n  << Compute >>"
 
 
 def test_backend_run_layer_forwards_timeloop_kwargs() -> None:
@@ -58,6 +59,7 @@ def test_backend_run_layer_forwards_timeloop_kwargs() -> None:
     ]
     assert result.metadata["network"] == "toy"
     assert result.metadata["architecture"] == "T1, P2, C3, R4"
+    assert result.mapping_text == FakeStats.mapping
 
 
 def test_backend_run_batch_forwards_only_timeloop_kwargs() -> None:
@@ -107,3 +109,35 @@ def test_backend_run_batch_forwards_only_timeloop_kwargs() -> None:
     assert len(results) == 1
     assert results[0].metadata["row_index"] == "toy_row"
     assert results[0].energy_breakdown == {"adc": 1e-6}
+
+
+def test_backend_run_layer_forwards_generic_timeloop_config() -> None:
+    calls = []
+
+    def fake_quick_run(**kwargs):
+        calls.append(kwargs)
+        return FakeStats()
+
+    backend = TimeloopBackend(quick_run=fake_quick_run)
+    layer = TimeloopLayerRef(network="deap_deepbench", layer_path="deap_deepbench/bench0")
+    architecture = TimeloopMacroConfig(
+        macro="deap_cnns",
+        system="fetch_all_lpddr4",
+        variables={"N_COLUMNS": 100, "N_ROWS": 12, "N_Conv": 1},
+        architecture_key="deap_cnns:R10_D12",
+        max_utilization=False,
+    )
+
+    result = backend.run_layer(layer, architecture)
+
+    assert calls == [
+        {
+            "macro": "deap_cnns",
+            "layer": "deap_deepbench/bench0",
+            "variables": {"N_COLUMNS": 100, "N_ROWS": 12, "N_Conv": 1},
+            "system": "fetch_all_lpddr4",
+            "max_utilization": False,
+        }
+    ]
+    assert result.metadata["architecture"] == "deap_cnns:R10_D12"
+    assert result.metadata["macro"] == "deap_cnns"
