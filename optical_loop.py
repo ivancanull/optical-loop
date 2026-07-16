@@ -47,6 +47,7 @@ from opticalloop.applications.rosa import (  # noqa: E402
     ExperimentManifest,
     ReproductionAnalyzer,
     ReproductionRunner,
+    MultiSliceAnalyzer,
     default_rosa_workflow,
     parse_architecture_argument,
     write_reference_artifacts,
@@ -294,7 +295,9 @@ def _run_layer(args) -> None:
             n_rows=args.rows,
             macro=args.arch,
             system=args.system,
-            voltage_dac_resolution=args.voltage_dac_resolution,
+            input_slice_bits=getattr(
+                args, "input_slice_bits", getattr(args, "voltage_dac_resolution", 1)
+            ),
             scaling=args.scaling,
             max_utilization=args.max_utilization,
         )
@@ -378,6 +381,44 @@ def _run_reproduce(args) -> None:
         print(f"{name}: {path}")
     validation = pd.read_csv(artifacts["validation.csv"])
     if ((validation["severity"] == "ERROR") & (validation["status"] == "FAIL")).any():
+        raise SystemExit(1)
+
+
+def _run_multislice(args) -> None:
+    manifest = ExperimentManifest(args.manifest, repo_root=_repo_root())
+    doctor = EnvironmentDoctor(manifest)
+    if args.action == "doctor":
+        report = doctor.check()
+        print(report.to_string(index=False))
+        if (report["status"] == "FAIL").any():
+            raise SystemExit(2)
+        return
+
+    if args.action in {"smoke", "full"}:
+        preflight = doctor.check()
+        failed = preflight[preflight.status == "FAIL"]
+        if not failed.empty:
+            print(failed.to_string(index=False))
+            raise SystemExit("Environment doctor failed; simulation was not started")
+        run_dir = ReproductionRunner(manifest, args.run_root).run(
+            args.action,
+            resume=not args.no_resume,
+            fail_fast=args.fail_fast,
+            workers=args.workers,
+        )
+    else:
+        if args.run_dir is None:
+            raise SystemExit(f"multislice {args.action} requires --run-dir")
+        run_dir = args.run_dir
+
+    outputs = MultiSliceAnalyzer(manifest, run_dir).analyze(
+        execute_notebook=not args.skip_notebook
+    )
+    print(f"Run directory: {Path(run_dir).resolve()}")
+    for name, path in sorted(outputs.items()):
+        print(f"{name}: {path}")
+    validation = pd.read_csv(outputs["validation.csv"])
+    if ((validation.severity == "ERROR") & (validation.status == "FAIL")).any():
         raise SystemExit(1)
 
 
@@ -495,7 +536,11 @@ def _add_layer_parser(subparsers) -> None:
     parser.add_argument("--pes", type=int, default=None)
     parser.add_argument("--cols", type=int, default=None)
     parser.add_argument("--rows", type=int, default=None)
-    parser.add_argument("--voltage-dac-resolution", type=int, default=1)
+    parser.add_argument(
+        "--input-slice-bits", "--voltage-dac-resolution",
+        dest="input_slice_bits", type=int, choices=(1, 2, 4, 8), default=1,
+        help="Bits per temporal input symbol; the old option name remains an alias.",
+    )
     parser.add_argument("--scaling", default='"aggressive"')
     parser.add_argument("--max-utilization", action="store_true")
     parser.add_argument(
@@ -527,6 +572,23 @@ def _add_reproduce_parser(subparsers) -> None:
     parser.set_defaults(func=_run_reproduce)
 
 
+def _add_multislice_parser(subparsers) -> None:
+    parser = subparsers.add_parser(
+        "multislice", help="Run MB-OSA and Adaptive Slice-Width Mapping experiments."
+    )
+    parser.add_argument("action", choices=("doctor", "smoke", "full", "analyze", "validate"))
+    parser.add_argument(
+        "--manifest", type=Path, default=Path("examples/rosa/mb_osa_manifest.yaml")
+    )
+    parser.add_argument("--run-root", type=Path, default=Path("multislice-runs"))
+    parser.add_argument("--run-dir", type=Path, default=None)
+    parser.add_argument("--workers", type=int, default=4)
+    parser.add_argument("--no-resume", action="store_true")
+    parser.add_argument("--fail-fast", action="store_true")
+    parser.add_argument("--skip-notebook", action="store_true")
+    parser.set_defaults(func=_run_multislice)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Run Timeloop-backed OpticalLoop simulations and applications."
@@ -535,6 +597,7 @@ def main() -> None:
     _add_layer_parser(subparsers)
     _add_rosa_parser(subparsers)
     _add_reproduce_parser(subparsers)
+    _add_multislice_parser(subparsers)
     args = parser.parse_args()
     args.func(args)
 

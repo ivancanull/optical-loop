@@ -47,6 +47,9 @@ class ReproductionJob:
     pes: int
     cols: int
     rows: int
+    slice_bits: int
+    temporal_slices: int
+    radix: int
 
 
 def _execute_native_job(
@@ -59,6 +62,7 @@ def _execute_native_job(
             MRRMacroConfig(
                 n_tiles=job.tiles, n_pes=job.pes, n_cols=job.cols, n_rows=job.rows,
                 macro=job.macro, system=system, max_utilization=False,
+                input_slice_bits=job.slice_bits,
             ),
         )
         return result, None
@@ -94,7 +98,9 @@ class ExperimentManifest:
             raise ValueError(f"Expected one architecture named {name!r}")
         return matches[0]
 
-    def jobs(self, tier: str) -> tuple[ReproductionJob, ...]:
+    def jobs(
+        self, tier: str, *, manifest_digest: Optional[str] = None
+    ) -> tuple[ReproductionJob, ...]:
         if tier not in {"smoke", "full"}:
             raise ValueError(f"Unknown reproduction tier: {tier}")
         architectures = self.raw["architectures"]
@@ -109,13 +115,22 @@ class ExperimentManifest:
                 if not smoke_path.exists():
                     raise ValueError(f"Smoke layer does not exist: {layers[0]}")
             for variant, variant_spec in self.raw["variants"].items():
+                slice_bits = int(variant_spec.get("slice_bits", 1))
+                if slice_bits not in {1, 2, 4, 8}:
+                    raise ValueError(f"Unsupported slice width for {variant}: {slice_bits}")
                 for architecture in architectures:
                     for layer in layers:
                         identity = {
-                            "manifest": self.digest,
+                            # Validation of an existing immutable run uses the
+                            # digest recorded when that run was created. This
+                            # permits analysis-only settings (such as a larger
+                            # exact-frontier safety cap) to evolve without
+                            # relabeling native mapper checkpoints.
+                            "manifest": manifest_digest or self.digest,
                             "network": network,
                             "layer": layer,
                             "variant": variant,
+                            "slice_bits": slice_bits,
                             "architecture": architecture["name"],
                         }
                         jobs.append(
@@ -130,6 +145,9 @@ class ExperimentManifest:
                                 pes=int(architecture["pes"]),
                                 cols=int(architecture["cols"]),
                                 rows=int(architecture["rows"]),
+                                slice_bits=slice_bits,
+                                temporal_slices=(8 + slice_bits - 1) // slice_bits,
+                                radix=2 ** slice_bits,
                             )
                         )
         return tuple(jobs)
@@ -230,7 +248,8 @@ class EnvironmentDoctor:
         if completed.returncode == 0 and output:
             return output[0]
         stat = Path(path).stat()
-        return f"{Path(path).resolve()} size={stat.st_size}"
+        digest = hashlib.sha256(Path(path).read_bytes()).hexdigest()
+        return f"{Path(path).name} size={stat.st_size} sha256={digest}"
 
     @staticmethod
     def _package_version(package: str) -> Optional[str]:
@@ -379,6 +398,7 @@ class ReproductionRunner:
                 MRRMacroConfig(
                     n_tiles=job.tiles, n_pes=job.pes, n_cols=job.cols, n_rows=job.rows,
                     macro=job.macro, system=self.manifest.raw["system"], max_utilization=False,
+                    input_slice_bits=job.slice_bits,
                 ),
             )
             return self._success_payload(job, result)

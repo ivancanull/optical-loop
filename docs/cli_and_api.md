@@ -20,6 +20,15 @@ execute the notebook. Use `--skip-notebook` only for debugging. Successful jobs
 resume by default. `--no-resume` is a safety assertion that rejects an existing
 provenance-keyed run; use it only with an unused `--run-root`.
 
+MB-OSA and ASWM use the parallel `multislice` application:
+
+```bash
+python3 optical_loop.py multislice doctor
+python3 optical_loop.py multislice smoke --workers 4
+python3 optical_loop.py multislice full --workers 128
+python3 optical_loop.py multislice analyze --run-dir multislice-runs/<run-id>
+```
+
 ## Generic Layer Command
 
 Run one Timeloop-backed layer:

@@ -31,6 +31,12 @@ technology,scaling,resolution,action,energy,area,global_cycle_seconds,comment
 7nm,aggressive_,8,convert|read|leak,0,60000,1
 7nm,aggressive,1,write|update,5.2,3750,1,energy in pJ;  area in um^2
 7nm,aggressive,1,convert|read|leak,0,3750,1
+7nm,aggressive,2,write|update,10.4,7500,1,MB-OSA primary model: 5.2 pJ/bit; area linear from 1-bit
+7nm,aggressive,2,convert|read|leak,0,7500,1
+7nm,aggressive,4,write|update,20.8,15000,1,MB-OSA primary model: 5.2 pJ/bit; area linear from 1-bit
+7nm,aggressive,4,convert|read|leak,0,15000,1
+7nm,aggressive,8,write|update,41.6,30000,1,Analog reference: 5.2 pJ/bit; area linear from 1-bit
+7nm,aggressive,8,convert|read|leak,0,30000,1
 
 COMPONENT: mrr
 technology,scaling,resolution,action,energy,area,global_cycle_seconds,comment

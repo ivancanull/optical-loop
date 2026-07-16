@@ -113,7 +113,7 @@ architecture:
       depth: ENCODED_OUTPUT_BITS
       width: N_ROWS
       n_instances: N_ROWS
-  
+
   - !Component # Photodiode converts output light to analog current
     name: photodiode_output_readout
     <<<: [*component_defaults, *keep_outputs, *no_coalesce]
@@ -137,6 +137,7 @@ architecture:
     <<<: [*component_defaults, *keep_inputs, *no_coalesce]
     subclass: dac_cache
     attributes:
+      resolution: VOLTAGE_DAC_RESOLUTION
       depth: INPUT_BITS_PER_SLICE
       width: N_COLUMNS # One laser per wavelength
       n_instances: N_COLUMNS
@@ -175,4 +176,3 @@ architecture:
 
   - !Hierarchical           # Virtualize an XxYxZ-bit MAC as multiple MAC units.
     nodes: *virtualized_mac # Defined in include/defines.yaml.
-  

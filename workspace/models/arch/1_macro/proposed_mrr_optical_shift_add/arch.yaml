@@ -132,6 +132,7 @@ architecture:
     <<<: [*component_defaults, *keep_inputs, *no_coalesce]
     subclass: dac_cache
     attributes:
+      resolution: VOLTAGE_DAC_RESOLUTION
       depth: INPUT_BITS_PER_SLICE
       width: N_COLUMNS # One laser per wavelength
       n_instances: N_COLUMNS

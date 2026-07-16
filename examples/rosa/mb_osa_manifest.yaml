@@ -1,0 +1,55 @@
+schema_version: 1
+name: mb-osa-aswm
+scope: edp-only
+technology_nm: 45
+frequency_hz: 5000000000
+quantization_bits: 8
+accuracy_status: NOT_MODELED
+system: fetch_all_lpddr4
+workloads:
+  alexnet: {layer_glob: "workspace/models/workloads/alexnet/*.yaml", expected_layers: 8}
+  vgg16: {layer_glob: "workspace/models/workloads/vgg16/*.yaml", expected_layers: 16}
+  resnet18: {layer_glob: "workspace/models/workloads/resnet18/*.yaml", expected_layers: 21}
+  mobilenet_v3: {layer_glob: "workspace/models/workloads/mobilenet_v3/*.yaml", expected_layers: 64}
+  gpt2_medium: {layer_glob: "workspace/models/workloads/gpt2_medium/*.yaml", expected_layers: 145}
+  vision_transformer: {layer_glob: "workspace/models/workloads/vision_transformer/*.yaml", expected_layers: 98}
+variants:
+  analog8: {macro: proposed_mrr, slice_bits: 8, mapping: Analog}
+  mbosa1: {macro: proposed_mrr_optical_shift_add, slice_bits: 1, mapping: Digital}
+  mbosa2: {macro: proposed_mrr_optical_shift_add, slice_bits: 2, mapping: MB-OSA-2}
+  mbosa4: {macro: proposed_mrr_optical_shift_add, slice_bits: 4, mapping: MB-OSA-4}
+architectures:
+  - {name: deap_high_channel, tiles: 1, pes: 1, cols: 9, rows: 113, candidate: false}
+  - {name: deap_wide_kernel, tiles: 1, pes: 1, cols: 100, rows: 12, candidate: false}
+  - {name: compact_4x4, tiles: 1, pes: 64, cols: 4, rows: 4, candidate: true}
+  - {name: c4_r8, tiles: 1, pes: 32, cols: 4, rows: 8, candidate: true}
+  - {name: c4_r16, tiles: 1, pes: 16, cols: 4, rows: 16, candidate: true}
+  - {name: c4_r32, tiles: 1, pes: 8, cols: 4, rows: 32, candidate: true}
+  - {name: c8_r4, tiles: 1, pes: 32, cols: 8, rows: 4, candidate: true}
+  - {name: paper_optimum_8x8, tiles: 1, pes: 16, cols: 8, rows: 8, candidate: true}
+  - {name: c8_r16, tiles: 1, pes: 8, cols: 8, rows: 16, candidate: true}
+  - {name: c8_r32, tiles: 1, pes: 4, cols: 8, rows: 32, candidate: true}
+constraints: {max_candidate_cols: 8, max_weight_mrrs: 1024}
+aswm:
+  candidate_slice_bits: [1, 2, 4]
+  pareto_frontier_limit: 2000000
+  primary_energy_model: linear_bit
+  primary_optical_loss_db_per_stage: 0.0
+energy_models:
+  optimistic_constant_symbol: {description: constant DAC energy per temporal symbol}
+  linear_bit: {description: "primary: DAC symbol energy = 5.2 pJ * slice bits"}
+  conservative_walden: {description: "DAC symbol energy proportional to 2^bits - 1"}
+optical_loss_db_per_stage: [0.0, 0.5, 1.0]
+smoke:
+  architecture: paper_optimum_8x8
+  layers:
+    alexnet: "0"
+    vgg16: "00"
+    resnet18: "00"
+    mobilenet_v3: "00"
+    gpt2_medium: "000"
+    vision_transformer: "00"
+tolerances:
+  edp_relative: 1.0e-9
+  cycle_ratio_relative: 0.05
+  dac_scaling_relative: 0.05

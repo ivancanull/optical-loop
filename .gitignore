@@ -9,6 +9,7 @@ __pycache__/
 workspace/outputs/
 results/
 reproduction-runs/
+multislice-runs/
 paper/
 reference/
 !examples/rosa/

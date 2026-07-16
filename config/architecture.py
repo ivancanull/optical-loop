@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass, field
 from typing import Mapping, Optional
+import warnings
 
 
 def _require_positive_int(name: str, value: int) -> None:
@@ -65,7 +66,8 @@ class MRRMacroConfig:
     n_cols: int
     macro: str = "proposed_mrr_optical_shift_add"
     system: str = "fetch_all_lpddr4"
-    voltage_dac_resolution: int = 1
+    input_slice_bits: int = 1
+    voltage_dac_resolution: Optional[int] = None
     scaling: str = '"aggressive"'
     max_utilization: bool = True
     frequency_hz: Optional[float] = None
@@ -80,7 +82,19 @@ class MRRMacroConfig:
             raise ValueError("macro cannot be empty")
         if not self.system:
             raise ValueError("system cannot be empty")
-        _require_positive_int("voltage_dac_resolution", self.voltage_dac_resolution)
+        slice_bits = self.input_slice_bits
+        if self.voltage_dac_resolution is not None:
+            warnings.warn(
+                "voltage_dac_resolution is deprecated; use input_slice_bits",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            if self.input_slice_bits != 1 and self.input_slice_bits != self.voltage_dac_resolution:
+                raise ValueError("input_slice_bits and voltage_dac_resolution disagree")
+            slice_bits = self.voltage_dac_resolution
+        if slice_bits not in {1, 2, 4, 8}:
+            raise ValueError("input_slice_bits must be one of 1, 2, 4, or 8")
+        object.__setattr__(self, "input_slice_bits", slice_bits)
         if not self.scaling:
             raise ValueError("scaling cannot be empty")
         if self.frequency_hz is not None:
@@ -103,5 +117,12 @@ class MRRMacroConfig:
             "N_PES": self.n_pes,
             "N_COLUMNS": self.n_cols,
             "N_ROWS": self.n_rows,
-            "VOLTAGE_DAC_RESOLUTION": self.voltage_dac_resolution,
+            "VOLTAGE_DAC_RESOLUTION": self.input_slice_bits,
+            "INPUT_SLICE_BITS": self.input_slice_bits,
+            "SLICE_RADIX": 2 ** self.input_slice_bits,
+            "N_TEMPORAL_SLICES": (8 + self.input_slice_bits - 1) // self.input_slice_bits,
+            "N_DELAY_STAGES": max(
+                (8 + self.input_slice_bits - 1) // self.input_slice_bits - 1,
+                0,
+            ),
         }

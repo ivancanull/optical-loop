@@ -1,4 +1,4 @@
-.PHONY: image doctor test smoke full
+.PHONY: image doctor test smoke full multislice-smoke multislice-full
 
 export UID := $(shell id -u)
 export GID := $(shell id -g)
@@ -17,3 +17,9 @@ smoke: image
 
 full: image
 	docker compose run --rm opticalloop python3 optical_loop.py reproduce full --workers $${WORKERS:-4}
+
+multislice-smoke: image
+	docker compose run --rm opticalloop python3 optical_loop.py multislice smoke --workers $${WORKERS:-4}
+
+multislice-full: image
+	docker compose run --rm opticalloop python3 optical_loop.py multislice full --workers $${WORKERS:-4}

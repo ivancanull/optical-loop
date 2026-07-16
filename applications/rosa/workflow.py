@@ -113,7 +113,7 @@ class ArchitectureSetting:
             n_rows=self.n_rows,
             macro=variant.macro,
             system=system,
-            voltage_dac_resolution=variant.voltage_dac_resolution,
+            input_slice_bits=variant.voltage_dac_resolution,
             scaling=variant.scaling,
             max_utilization=variant.max_utilization,
         )

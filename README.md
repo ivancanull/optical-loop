@@ -23,12 +23,13 @@ independent EDP reproduction procedure and its documented paper-alignment gaps.
 
 ## Features
 
-OpticalLoop currently provides three main capabilities:
+OpticalLoop currently provides four main capabilities:
 
 | Feature | Description |
 | --- | --- |
 | Generic layer simulation | Run one Timeloop mapper job from a macro, workload, and explicit variables. |
 | ROSA application | Reproduce the ROSA/CIMLoop-style MRR optical computing workflow, including OSA/no-OSA comparisons, architecture ranking, validation, and plots. |
+| MB-OSA and ASWM | Sweep 1/2/4-bit temporal slices and select layer-wise slice width for minimum EDP with explicit DAC/loss sensitivity models. |
 | DEAP-CNNs notebook example | Run the `deap_cnns` macro through the same generic Timeloop path and inspect raw metrics, component breakdowns, and mapper loop text. |
 
 ## Quick Start
@@ -41,6 +42,18 @@ make smoke
 # Complete 7,040-job experiment:
 WORKERS=8 make full
 ```
+
+Run the new multi-bit temporal-slicing study:
+
+```bash
+make multislice-smoke
+WORKERS=128 make multislice-full
+```
+
+See [docs/mb_osa_aswm.md](docs/mb_osa_aswm.md). Accuracy is explicitly
+`NOT_MODELED`; the study reports energy, delay, and EDP only.
+The checked 14,080-job summary bundle is available under
+[`examples/rosa/mb_osa_reference`](examples/rosa/mb_osa_reference/REPORT.md).
 
 See [docs/dac26_reproduction.md](docs/dac26_reproduction.md) for runtime,
 resume, artifact, validation, and paper-gap details. The container pins the
@@ -259,6 +272,7 @@ result = LayerSimulator(layer=layer, architecture=architecture).run()
 | `docs/results_and_artifacts.md` | Result artifact meanings and validation formulas. |
 | `docs/development_guidelines.md` | OOP, KISS, adapter-boundary, and cleanup rules. |
 | `docs/dac26_reproduction.md` | Clean-checkout native simulation and validation guide. |
+| `docs/mb_osa_aswm.md` | MB-OSA hardware assumptions, ASWM policy, and experiment guide. |
 
 ## Included Macros
 

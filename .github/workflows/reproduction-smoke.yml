@@ -27,5 +27,7 @@ jobs:
         run: docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp/opticalloop-home -v "$PWD:/work/optical-loop" -w /work/optical-loop opticalloop-dac26:local python3 -m pytest -q
       - name: Native mapper smoke and notebook
         run: docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp/opticalloop-home -v "$PWD:/work/optical-loop" -w /work/optical-loop opticalloop-dac26:local python3 optical_loop.py reproduce smoke --workers 2
+      - name: MB-OSA multislice smoke and notebook
+        run: docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp/opticalloop-home -v "$PWD:/work/optical-loop" -w /work/optical-loop opticalloop-dac26:local python3 optical_loop.py multislice smoke --workers 4
       - name: Rotate build cache
         run: rm -rf /tmp/.buildx-cache && mv /tmp/.buildx-cache-new /tmp/.buildx-cache
