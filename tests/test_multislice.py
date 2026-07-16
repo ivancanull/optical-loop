@@ -33,12 +33,12 @@ class MultiSliceFakeBackend:
         energy = 0.1 + dac + laser
         return SimulationResult(
             cycles=cycles,
-            latency_s=cycles * 1e-9,
+            latency_s=cycles * 2e-10,
             energy_j=energy,
             energy_breakdown={"input_dac": dac, "laser": laser, "other": 0.1},
             area_mm2=1e-3,
             compute=1000.0,
-            cycle_seconds=1e-9,
+            cycle_seconds=2e-10,
             tops=1.0,
         )
 
@@ -57,6 +57,10 @@ def test_architecture_slice_width_interface_and_legacy_alias() -> None:
     assert legacy.input_slice_bits == 2
     with pytest.raises(ValueError, match="one of"):
         MRRMacroConfig(n_tiles=1, n_pes=16, n_cols=8, n_rows=8, input_slice_bits=3)
+    timed = MRRMacroConfig(
+        n_tiles=1, n_pes=16, n_cols=8, n_rows=8, frequency_hz=5e9
+    )
+    assert timed.to_timeloop_variables()["GLOBAL_CYCLE_SECONDS"] == pytest.approx(2e-10)
 
 
 def test_multislice_manifest_expands_expected_jobs(manifest) -> None:

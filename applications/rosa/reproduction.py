@@ -53,7 +53,7 @@ class ReproductionJob:
 
 
 def _execute_native_job(
-    job: ReproductionJob, system: str
+    job: ReproductionJob, system: str, frequency_hz: float
 ) -> tuple[Optional[SimulationResult], Optional[str]]:
     """Process-pool entrypoint; keep raw mapper calls inside the backend adapter."""
     try:
@@ -63,6 +63,7 @@ def _execute_native_job(
                 n_tiles=job.tiles, n_pes=job.pes, n_cols=job.cols, n_rows=job.rows,
                 macro=job.macro, system=system, max_utilization=False,
                 input_slice_bits=job.slice_bits,
+                frequency_hz=frequency_hz,
             ),
         )
         return result, None
@@ -366,7 +367,12 @@ class ReproductionRunner:
         with executor_type(max_workers=workers) as executor:
             if injected_backend is None:
                 futures = {
-                    executor.submit(_execute_native_job, job, self.manifest.raw["system"]): job
+                    executor.submit(
+                        _execute_native_job,
+                        job,
+                        self.manifest.raw["system"],
+                        float(self.manifest.raw["frequency_hz"]),
+                    ): job
                     for job in pending
                 }
             else:
@@ -399,6 +405,7 @@ class ReproductionRunner:
                     n_tiles=job.tiles, n_pes=job.pes, n_cols=job.cols, n_rows=job.rows,
                     macro=job.macro, system=self.manifest.raw["system"], max_utilization=False,
                     input_slice_bits=job.slice_bits,
+                    frequency_hz=float(self.manifest.raw["frequency_hz"]),
                 ),
             )
             return self._success_payload(job, result)

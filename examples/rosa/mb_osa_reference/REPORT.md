@@ -54,6 +54,7 @@ Accuracy status: **NOT_MODELED**. No accuracy constraint or claim is applied.
 | ERROR | PASS | workload_layer_completeness | {"alexnet": {"missing": 0, "unexpected": 0}, "gpt2_medium": {"missing": 0, "unexpected": 0}, "mobilenet_v3": {"missing": 0, "unexpected": 0}, "resnet18": {"missing": 0, "unexpected": 0}, "vgg16": {"missing": 0, "unexpected": 0}, "vision_transformer": {"missing": 0, "unexpected": 0}} |
 | ERROR | PASS | architecture_constraints | invalid_candidates=[], shape_mismatches=0 |
 | ERROR | PASS | unit_consistency | positive=True, max_latency_relative=0.000e+00 |
+| ERROR | PASS | frequency_consistency | expected_hz=5000000000, max_relative=0.000e+00 |
 | ERROR | PASS | native_dac_resolution_scaling | max_absolute_ratio_deviation=0.0225564 |
 | ERROR | PASS | edp_formula | max=0.000e+00 |
 | ERROR | PASS | aswm_no_worse_than_fixed | worse=[] |

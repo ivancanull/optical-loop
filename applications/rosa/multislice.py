@@ -645,6 +645,15 @@ class MultiSliceValidator:
                 bool(positive_units.all() and (latency_relative <= 1e-9).all()),
                 f"positive={bool(positive_units.all())}, max_latency_relative={latency_relative.max():.3e}",
             ))
+            expected_cycle_seconds = 1.0 / float(self.manifest.raw["frequency_hz"])
+            frequency_relative = (
+                raw.cycle_seconds - expected_cycle_seconds
+            ).abs() / expected_cycle_seconds
+            rows.append(self._check(
+                "frequency_consistency",
+                bool((frequency_relative <= 1e-12).all()),
+                f"expected_hz={self.manifest.raw['frequency_hz']}, max_relative={frequency_relative.max():.3e}",
+            ))
             osa = raw[raw.slice_bits.isin(ASWM_SLICE_BITS)].copy()
             osa["input_dac_energy_j"] = osa.energy_breakdown.map(
                 lambda value: _component_sum(_mapping(value), "input_dac")

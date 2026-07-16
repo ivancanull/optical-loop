@@ -111,7 +111,7 @@ class MRRMacroConfig:
         return f"T{self.n_tiles}, P{self.n_pes}, C{self.n_cols}, R{self.n_rows}"
 
     def to_timeloop_variables(self) -> dict:
-        return {
+        variables = {
             "SCALING": self.scaling,
             "N_TILES": self.n_tiles,
             "N_PES": self.n_pes,
@@ -126,3 +126,6 @@ class MRRMacroConfig:
                 0,
             ),
         }
+        if self.frequency_hz is not None:
+            variables["GLOBAL_CYCLE_SECONDS"] = 1.0 / self.frequency_hz
+        return variables

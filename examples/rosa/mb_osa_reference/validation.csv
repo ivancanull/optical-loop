@@ -9,6 +9,7 @@ accuracy_not_modeled,ERROR,PASS,NOT_MODELED
 workload_layer_completeness,ERROR,PASS,"{""alexnet"": {""missing"": 0, ""unexpected"": 0}, ""gpt2_medium"": {""missing"": 0, ""unexpected"": 0}, ""mobilenet_v3"": {""missing"": 0, ""unexpected"": 0}, ""resnet18"": {""missing"": 0, ""unexpected"": 0}, ""vgg16"": {""missing"": 0, ""unexpected"": 0}, ""vision_transformer"": {""missing"": 0, ""unexpected"": 0}}"
 architecture_constraints,ERROR,PASS,"invalid_candidates=[], shape_mismatches=0"
 unit_consistency,ERROR,PASS,"positive=True, max_latency_relative=0.000e+00"
+frequency_consistency,ERROR,PASS,"expected_hz=5000000000, max_relative=0.000e+00"
 native_dac_resolution_scaling,ERROR,PASS,max_absolute_ratio_deviation=0.0225564
 edp_formula,ERROR,PASS,max=0.000e+00
 aswm_no_worse_than_fixed,ERROR,PASS,worse=[]
