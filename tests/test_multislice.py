@@ -50,6 +50,11 @@ class MultiSliceFakeBackend:
         )
 
 
+class InterruptingBackend:
+    def run_layer(self, layer, architecture) -> SimulationResult:
+        raise KeyboardInterrupt
+
+
 def test_front_mrr_slice_width_interface() -> None:
     config = MRRMacroConfig(n_tiles=1, n_pes=16, n_cols=8, n_rows=8, front_mrr_slice_bits=4)
     variables = config.to_timeloop_variables()
@@ -199,6 +204,19 @@ def test_multislice_smoke_analysis_and_accuracy_boundary(manifest, tmp_path: Pat
     assert "not whole-network EDP results" in report
     metadata = json.loads((run_dir / "run.json").read_text())
     assert metadata["successful_jobs"] == 72
+
+
+def test_interrupted_run_records_progress_for_resume(manifest, tmp_path: Path) -> None:
+    runner = ReproductionRunner(manifest, tmp_path, backend=InterruptingBackend())
+    with pytest.raises(KeyboardInterrupt):
+        runner.run("smoke", workers=1)
+
+    metadata_path = next(tmp_path.glob("*/run.json"))
+    metadata = json.loads(metadata_path.read_text())
+    assert metadata["status"] == "interrupted"
+    assert metadata["successful_jobs"] == 0
+    assert metadata["failed_jobs"] == 0
+    assert metadata["remaining_jobs"] == 72
 
 
 def test_validator_rejects_substituted_job_and_invalid_shape(manifest, tmp_path: Path) -> None:

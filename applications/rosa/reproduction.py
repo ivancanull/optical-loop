@@ -385,6 +385,9 @@ class ReproductionRunner:
                 and json.loads((jobs_dir / f"{job.job_id}.json").read_text()).get("status") == "success"
             )
         ]
+        if pending and metadata.get("status") != "running":
+            metadata.update({"status": "running", "resumed_at": _utc_now()})
+            self._atomic_json(metadata_path, metadata)
         executor_type = ThreadPoolExecutor if self.backend is not None else ProcessPoolExecutor
         # A caller-supplied backend is primarily a test/embedding seam and may
         # not be picklable. Production native runs use processes because YAML
@@ -395,7 +398,9 @@ class ReproductionRunner:
             injected_backend = None
         else:
             executor_type = ThreadPoolExecutor
-        with executor_type(max_workers=workers) as executor:
+        executor = executor_type(max_workers=workers)
+        futures = {}
+        try:
             if injected_backend is None:
                 futures = {
                     executor.submit(
@@ -425,8 +430,30 @@ class ReproductionRunner:
                     for remaining in futures:
                         remaining.cancel()
                     break
+        except KeyboardInterrupt:
+            for future in futures:
+                future.cancel()
+            self._stop_executor(executor)
+            self._record_progress(
+                metadata_path, metadata, jobs_dir, jobs, status="interrupted"
+            )
+            raise
+        else:
+            executor.shutdown(wait=True)
         self._finalize(metadata_path, metadata, jobs_dir, jobs)
         return run_dir
+
+    @staticmethod
+    def _stop_executor(executor) -> None:
+        """Stop native workers promptly so an interrupted run can be resumed safely."""
+        # Python 3.10 has no public ProcessPoolExecutor termination API. Native
+        # workers may be inside long Timeloop calls, so cancelling queued
+        # futures alone would make context-manager shutdown wait for every job.
+        processes = getattr(executor, "_processes", None)
+        if processes:
+            for process in tuple(processes.values()):
+                process.terminate()
+        executor.shutdown(wait=False, cancel_futures=True)
 
     def _run_job(self, job: ReproductionJob) -> dict[str, object]:
         try:
@@ -471,13 +498,24 @@ class ReproductionRunner:
         return metadata
 
     def _finalize(self, path: Path, metadata: dict, jobs_dir: Path, jobs: Sequence[ReproductionJob]) -> None:
+        self._record_progress(path, metadata, jobs_dir, jobs)
+
+    def _record_progress(
+        self,
+        path: Path,
+        metadata: dict,
+        jobs_dir: Path,
+        jobs: Sequence[ReproductionJob],
+        *,
+        status: Optional[str] = None,
+    ) -> None:
         payloads = [json.loads((jobs_dir / f"{job.job_id}.json").read_text()) for job in jobs if (jobs_dir / f"{job.job_id}.json").exists()]
         succeeded = sum(payload["status"] == "success" for payload in payloads)
         failed = sum(payload["status"] == "failed" for payload in payloads)
         metadata.update({
             "updated_at": _utc_now(), "successful_jobs": succeeded, "failed_jobs": failed,
             "remaining_jobs": len(jobs) - len(payloads),
-            "status": "complete" if succeeded == len(jobs) else "incomplete",
+            "status": status or ("complete" if succeeded == len(jobs) else "incomplete"),
         })
         self._atomic_json(path, metadata)
 
