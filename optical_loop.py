@@ -295,9 +295,7 @@ def _run_layer(args) -> None:
             n_rows=args.rows,
             macro=args.arch,
             system=args.system,
-            input_slice_bits=getattr(
-                args, "input_slice_bits", getattr(args, "voltage_dac_resolution", 1)
-            ),
+            front_mrr_slice_bits=args.front_mrr_slice_bits,
             scaling=args.scaling,
             max_utilization=args.max_utilization,
         )
@@ -507,7 +505,7 @@ def _add_layer_parser(subparsers) -> None:
         "--arch",
         "--macro",
         dest="arch",
-        default="proposed_mrr_optical_shift_add",
+        default="mrr_ws_osa",
         help="Timeloop macro/architecture name.",
     )
     parser.add_argument(
@@ -537,9 +535,9 @@ def _add_layer_parser(subparsers) -> None:
     parser.add_argument("--cols", type=int, default=None)
     parser.add_argument("--rows", type=int, default=None)
     parser.add_argument(
-        "--input-slice-bits", "--voltage-dac-resolution",
-        dest="input_slice_bits", type=int, choices=(1, 2, 4, 8), default=1,
-        help="Bits per temporal input symbol; the old option name remains an alias.",
+        "--front-mrr-slice-bits",
+        dest="front_mrr_slice_bits", type=int, choices=(1, 2, 4, 8), default=1,
+        help="Bits per temporal symbol at the first MRR modulation stage.",
     )
     parser.add_argument("--scaling", default='"aggressive"')
     parser.add_argument("--max-utilization", action="store_true")

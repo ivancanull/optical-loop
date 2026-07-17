@@ -31,13 +31,15 @@ variables:
   # ===========================================================================
   CIM_UNIT_WIDTH_CELLS:  1
   CIM_UNIT_DEPTH_CELLS:  1
-  BITS_PER_CELL:         8
+  # The first MRR stage carries temporal weight slices. Inputs remain 8-bit.
+  FRONT_MRR_SLICE_BITS: 1
+  BITS_PER_CELL:         FRONT_MRR_SLICE_BITS
 
   # ===========================================================================
   # Data Converters
   # ===========================================================================
   ADC_RESOLUTION: 8
-  VOLTAGE_DAC_RESOLUTION: 1
+  VOLTAGE_DAC_RESOLUTION: 8
   TEMPORAL_DAC_RESOLUTION: 1
   DAC_RESOLUTION: max(VOLTAGE_DAC_RESOLUTION, TEMPORAL_DAC_RESOLUTION)
   N_ADC_PER_BANK: N_COLUMNS

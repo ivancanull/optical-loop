@@ -14,10 +14,18 @@ workloads:
   gpt2_medium: {layer_glob: "workspace/models/workloads/gpt2_medium/*.yaml", expected_layers: 145}
   vision_transformer: {layer_glob: "workspace/models/workloads/vision_transformer/*.yaml", expected_layers: 98}
 variants:
-  analog8: {macro: proposed_mrr, slice_bits: 8, mapping: Analog}
-  mbosa1: {macro: proposed_mrr_optical_shift_add, slice_bits: 1, mapping: Digital}
-  mbosa2: {macro: proposed_mrr_optical_shift_add, slice_bits: 2, mapping: MB-OSA-2}
-  mbosa4: {macro: proposed_mrr_optical_shift_add, slice_bits: 4, mapping: MB-OSA-4}
+  ws_no_osa_1: {macro: mrr_ws_no_osa, stationarity: WS, accumulation: digital, sliced_operand: input, front_mrr_slice_bits: 1, mapping: Digital-WS}
+  ws_no_osa_8: {macro: mrr_ws_no_osa, stationarity: WS, accumulation: none, sliced_operand: input, front_mrr_slice_bits: 8, mapping: Analog-WS}
+  is_no_osa_1: {macro: mrr_is_no_osa, stationarity: IS, accumulation: digital, sliced_operand: weight, front_mrr_slice_bits: 1, mapping: Digital-IS}
+  is_no_osa_8: {macro: mrr_is_no_osa, stationarity: IS, accumulation: none, sliced_operand: weight, front_mrr_slice_bits: 8, mapping: Analog-IS}
+  ws_osa_1: {macro: mrr_ws_osa, stationarity: WS, accumulation: optical, sliced_operand: input, front_mrr_slice_bits: 1, mapping: MB-OSA-WS-1}
+  ws_osa_2: {macro: mrr_ws_osa, stationarity: WS, accumulation: optical, sliced_operand: input, front_mrr_slice_bits: 2, mapping: MB-OSA-WS-2}
+  ws_osa_4: {macro: mrr_ws_osa, stationarity: WS, accumulation: optical, sliced_operand: input, front_mrr_slice_bits: 4, mapping: MB-OSA-WS-4}
+  ws_osa_8: {macro: mrr_ws_osa, stationarity: WS, accumulation: none, sliced_operand: input, front_mrr_slice_bits: 8, mapping: Analog-WS}
+  is_osa_1: {macro: mrr_is_osa, stationarity: IS, accumulation: optical, sliced_operand: weight, front_mrr_slice_bits: 1, mapping: MB-OSA-IS-1}
+  is_osa_2: {macro: mrr_is_osa, stationarity: IS, accumulation: optical, sliced_operand: weight, front_mrr_slice_bits: 2, mapping: MB-OSA-IS-2}
+  is_osa_4: {macro: mrr_is_osa, stationarity: IS, accumulation: optical, sliced_operand: weight, front_mrr_slice_bits: 4, mapping: MB-OSA-IS-4}
+  is_osa_8: {macro: mrr_is_osa, stationarity: IS, accumulation: none, sliced_operand: weight, front_mrr_slice_bits: 8, mapping: Analog-IS}
 architectures:
   - {name: deap_high_channel, tiles: 1, pes: 1, cols: 9, rows: 113, candidate: false}
   - {name: deap_wide_kernel, tiles: 1, pes: 1, cols: 100, rows: 12, candidate: false}
@@ -32,6 +40,7 @@ architectures:
 constraints: {max_candidate_cols: 8, max_weight_mrrs: 1024}
 aswm:
   candidate_slice_bits: [1, 2, 4]
+  candidate_stationarities: [WS, IS]
   pareto_frontier_limit: 2000000
   primary_energy_model: linear_bit
   primary_optical_loss_db_per_stage: 0.0

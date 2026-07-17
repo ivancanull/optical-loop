@@ -36,7 +36,7 @@ Run one Timeloop-backed layer:
 ```bash
 conda run -n timeloop python optical_loop.py layer \
   --workload alexnet/0 \
-  --arch proposed_mrr_optical_shift_add \
+  --arch mrr_ws_osa \
   --tiles 1 --pes 1 --cols 100 --rows 12
 ```
 
@@ -109,7 +109,7 @@ architecture = MRRMacroConfig(
     n_pes=1,
     n_cols=100,
     n_rows=12,
-    macro="proposed_mrr_optical_shift_add",
+    macro="mrr_ws_osa",
     max_utilization=False,
 )
 result = LayerSimulator(layer=layer, architecture=architecture).run()

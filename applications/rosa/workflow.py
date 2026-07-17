@@ -113,7 +113,7 @@ class ArchitectureSetting:
             n_rows=self.n_rows,
             macro=variant.macro,
             system=system,
-            input_slice_bits=variant.voltage_dac_resolution,
+            front_mrr_slice_bits=variant.voltage_dac_resolution,
             scaling=variant.scaling,
             max_utilization=variant.max_utilization,
         )
@@ -506,12 +506,12 @@ def default_rosa_workflow(
 ) -> RosaWorkflow:
     variants = (
         MacroVariant(
-            macro="proposed_mrr",
+            macro="mrr_ws_no_osa",
             label="MRR WS baseline",
             output_postfix="_1bit_input",
         ),
         MacroVariant(
-            macro="proposed_mrr_optical_shift_add",
+            macro="mrr_ws_osa",
             label="MRR WS optical shift-add",
             output_postfix="_1bit_input_osa",
         ),
@@ -673,11 +673,11 @@ def _layer_id(layer: str) -> str:
 
 def _hybrid_family_macros(family: str) -> Tuple[str, str]:
     if family == "osa":
-        return "proposed_mrr_optical_shift_add", "proposed_mrr_wi_optical_shift_add"
+        return "mrr_ws_osa", "mrr_is_osa"
     if family == "delay-line":
         return (
-            "proposed_mrr_1bit_input_delay_line",
-            "proposed_mrr_1bit_input_delay_line_wi",
+            "mrr_ws_no_osa",
+            "mrr_is_no_osa",
         )
     raise ValueError(f"Unknown hybrid family: {family!r}")
 

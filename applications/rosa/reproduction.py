@@ -47,8 +47,12 @@ class ReproductionJob:
     pes: int
     cols: int
     rows: int
-    slice_bits: int
+    stationarity: str
+    accumulation: str
+    sliced_operand: str
+    front_mrr_slice_bits: int
     temporal_slices: int
+    temporal_accumulations: int
     radix: int
 
 
@@ -62,7 +66,7 @@ def _execute_native_job(
             MRRMacroConfig(
                 n_tiles=job.tiles, n_pes=job.pes, n_cols=job.cols, n_rows=job.rows,
                 macro=job.macro, system=system, max_utilization=False,
-                input_slice_bits=job.slice_bits,
+                front_mrr_slice_bits=job.front_mrr_slice_bits,
                 frequency_hz=frequency_hz,
             ),
         )
@@ -116,7 +120,7 @@ class ExperimentManifest:
                 if not smoke_path.exists():
                     raise ValueError(f"Smoke layer does not exist: {layers[0]}")
             for variant, variant_spec in self.raw["variants"].items():
-                slice_bits = int(variant_spec.get("slice_bits", 1))
+                slice_bits = int(variant_spec.get("front_mrr_slice_bits", 1))
                 if slice_bits not in {1, 2, 4, 8}:
                     raise ValueError(f"Unsupported slice width for {variant}: {slice_bits}")
                 for architecture in architectures:
@@ -146,8 +150,12 @@ class ExperimentManifest:
                                 pes=int(architecture["pes"]),
                                 cols=int(architecture["cols"]),
                                 rows=int(architecture["rows"]),
-                                slice_bits=slice_bits,
+                                stationarity=str(variant_spec.get("stationarity", "WS")),
+                                accumulation=str(variant_spec.get("accumulation", "none")),
+                                sliced_operand=str(variant_spec.get("sliced_operand", "input")),
+                                front_mrr_slice_bits=slice_bits,
                                 temporal_slices=(8 + slice_bits - 1) // slice_bits,
+                                temporal_accumulations=(8 + slice_bits - 1) // slice_bits - 1,
                                 radix=2 ** slice_bits,
                             )
                         )
@@ -183,6 +191,29 @@ class ExperimentManifest:
                 )
         if sum(spec["expected_layers"] for spec in self.raw["workloads"].values()) != 352:
             raise ValueError("DAC26 manifest must contain exactly 352 workload layers")
+        if "aswm" in self.raw:
+            variants = self.raw["variants"]
+            expected_widths = {
+                "mrr_ws_no_osa": {1, 8}, "mrr_is_no_osa": {1, 8},
+                "mrr_ws_osa": {1, 2, 4, 8}, "mrr_is_osa": {1, 2, 4, 8},
+            }
+            actual_widths = {
+                macro: {
+                    int(spec["front_mrr_slice_bits"])
+                    for spec in variants.values() if spec["macro"] == macro
+                }
+                for macro in expected_widths
+            }
+            if actual_widths != expected_widths or len(variants) != 12:
+                raise ValueError(
+                    f"MB-OSA variants must encode the 12-mode focused matrix: {actual_widths}"
+                )
+            for spec in variants.values():
+                expected_operand = "input" if spec["stationarity"] == "WS" else "weight"
+                if spec["sliced_operand"] != expected_operand:
+                    raise ValueError(
+                        f"{spec['stationarity']} must slice the front {expected_operand} operand"
+                    )
 
 
 class EnvironmentDoctor:
@@ -404,7 +435,7 @@ class ReproductionRunner:
                 MRRMacroConfig(
                     n_tiles=job.tiles, n_pes=job.pes, n_cols=job.cols, n_rows=job.rows,
                     macro=job.macro, system=self.manifest.raw["system"], max_utilization=False,
-                    input_slice_bits=job.slice_bits,
+                    front_mrr_slice_bits=job.front_mrr_slice_bits,
                     frequency_hz=float(self.manifest.raw["frequency_hz"]),
                 ),
             )
@@ -462,6 +493,7 @@ class ReproductionRunner:
                 "energy_breakdown": result.energy_breakdown,
                 "area_breakdown": result.area_breakdown,
                 "power_breakdown": result.power_breakdown,
+                "mapping_text": result.mapping_text,
             },
         }
 

@@ -13,8 +13,8 @@ workloads:
   gpt2_medium: {layer_glob: "workspace/models/workloads/gpt2_medium/*.yaml", expected_layers: 145}
   vision_transformer: {layer_glob: "workspace/models/workloads/vision_transformer/*.yaml", expected_layers: 98}
 variants:
-  no_osa: {macro: proposed_mrr, output_suffix: _1bit_input}
-  osa: {macro: proposed_mrr_optical_shift_add, output_suffix: _1bit_input_osa}
+  no_osa: {macro: mrr_ws_no_osa, output_suffix: _1bit_input}
+  osa: {macro: mrr_ws_osa, output_suffix: _1bit_input_osa}
 architectures:
   - {name: deap_high_channel, tiles: 1, pes: 1, cols: 9, rows: 113, candidate: false}
   - {name: deap_wide_kernel, tiles: 1, pes: 1, cols: 100, rows: 12, candidate: false}

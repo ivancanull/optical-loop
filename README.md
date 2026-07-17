@@ -29,7 +29,7 @@ OpticalLoop currently provides four main capabilities:
 | --- | --- |
 | Generic layer simulation | Run one Timeloop mapper job from a macro, workload, and explicit variables. |
 | ROSA application | Reproduce the ROSA/CIMLoop-style MRR optical computing workflow, including OSA/no-OSA comparisons, architecture ranking, validation, and plots. |
-| MB-OSA and ASWM | Sweep 1/2/4-bit temporal slices and select layer-wise slice width for minimum EDP with explicit DAC/loss sensitivity models. |
+| WS/IS MB-OSA and ASWM | Compare four stationary/accumulation structures and select layer-wise stationarity plus 1/2/4-bit front-MRR slices. |
 | DEAP-CNNs notebook example | Run the `deap_cnns` macro through the same generic Timeloop path and inspect raw metrics, component breakdowns, and mapper loop text. |
 
 ## Quick Start
@@ -52,7 +52,7 @@ WORKERS=128 make multislice-full
 
 See [docs/mb_osa_aswm.md](docs/mb_osa_aswm.md). Accuracy is explicitly
 `NOT_MODELED`; the study reports energy, delay, and EDP only.
-The checked 14,080-job summary bundle is available under
+The checked 42,240-job summary bundle is available under
 [`examples/rosa/mb_osa_reference`](examples/rosa/mb_osa_reference/REPORT.md).
 
 See [docs/dac26_reproduction.md](docs/dac26_reproduction.md) for runtime,
@@ -95,7 +95,7 @@ For ROSA/MRR-style macros, you can also use the shape shorthand:
 
 ```bash
 conda run -n timeloop python optical_loop.py layer \
-  --arch proposed_mrr_optical_shift_add \
+  --arch mrr_ws_osa \
   --workload alexnet/0 \
   --tiles 1 \
   --pes 1 \
@@ -107,10 +107,11 @@ Common options:
 
 | Option | Meaning |
 | --- | --- |
-| `--arch` | Timeloop macro name, such as `deap_cnns` or `proposed_mrr_optical_shift_add`. |
+| `--arch` | Timeloop macro name, such as `deap_cnns`, `mrr_ws_osa`, or `mrr_is_osa`. |
 | `--workload` | Workload path, such as `alexnet/0` or `deap_deepbench/bench0`. |
 | `--var KEY=VALUE` | Variable passed directly to Timeloop. May be repeated. |
 | `--tiles --pes --cols --rows` | Convenience shape options for MRR-style architectures. |
+| `--front-mrr-slice-bits` | Temporal symbol width at the first MRR stage: 1, 2, 4, or 8. |
 | `--system` | System wrapper. Defaults to `fetch_all_lpddr4`. |
 | `--show-mapping` | Print Timeloop mapper text. |
 
@@ -235,7 +236,7 @@ architecture = MRRMacroConfig(
     n_pes=1,
     n_cols=100,
     n_rows=12,
-    macro="proposed_mrr_optical_shift_add",
+    macro="mrr_ws_osa",
     max_utilization=False,
 )
 
@@ -280,12 +281,11 @@ The main optical macros live in `workspace/models/arch/1_macro/`:
 
 | Macro | Purpose |
 | --- | --- |
-| `proposed_mrr` | ROSA no-OSA baseline. |
-| `proposed_mrr_optical_shift_add` | ROSA OSA regular macro. |
-| `proposed_mrr_wi_optical_shift_add` | ROSA OSA hybrid selected macro. |
-| `proposed_mrr_1bit_input_delay_line` | Legacy delay-line regular macro. |
-| `proposed_mrr_1bit_input_delay_line_wi` | Legacy delay-line hybrid macro. |
-| `deap_cnns` | DEAP-CNNs notebook macro, reusing the `proposed_mrr` row/column input-sharing logic. |
+| `mrr_ws_no_osa` | Weight-stationary, front input slices, electronic accumulation. |
+| `mrr_ws_osa` | Weight-stationary, front input slices, optical accumulation. |
+| `mrr_is_no_osa` | Input-stationary, front weight slices, electronic accumulation. |
+| `mrr_is_osa` | Input-stationary, front weight slices, optical accumulation. |
+| `deap_cnns` | DEAP-CNNs notebook macro using the same row/column optical modeling framework. |
 
 ## Correctness And Hygiene
 

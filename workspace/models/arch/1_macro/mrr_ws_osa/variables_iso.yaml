@@ -27,19 +27,20 @@ variables:
 
   # Circuits ------------------------------------------------------------------
   VOLTAGE: 1
-  TECHNOLOGY: 7 # nm
+  TECHNOLOGY: 45 # nm
   CELL_CONFIG: None
   VOLTAGE_ENERGY_SCALE: (VOLTAGE / 1) ** 2
   VOLTAGE_LATENCY_SCALE: 1 / VOLTAGE
 
   # Calibration ---------------------------------------------------------------
-  SCALING: "aggressive"
+  SCALING: "aggressive" # aggressive, moderate, conservative, deapcnns
   scaling: SCALING # The lower-case version is propagated to some plug-ins.
 
   # Some pretty big scaling factors here because the Albireo paper uses a 28nm
   # ADC without scaling it to 7nm like the rest of the components, so the ADC is
   # much higher area and energy than it would be in a 7nm process.
-  ADC_ENERGY_SCALE: >
-    ({'aggressive': 0.91, 'moderate': 10.6, 'conservative': 21}[scaling])
-  ADC_AREA_SCALE: 9.1
+  ADC_ENERGY_SCALE: 1
+  #   ({'aggressive': 1.33, 'moderate': 10.6, 'conservative': 21.4, 'deapcnns': 55.7}[scaling])
+  # 55.7
+  ADC_AREA_SCALE: 1
   ROW_COL_DRIVERS_AREA_SCALE: 1

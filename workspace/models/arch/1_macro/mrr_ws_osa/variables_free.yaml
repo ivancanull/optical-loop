@@ -31,13 +31,14 @@ variables:
   # ===========================================================================
   CIM_UNIT_WIDTH_CELLS:  1
   CIM_UNIT_DEPTH_CELLS:  1
+  FRONT_MRR_SLICE_BITS: 1
   BITS_PER_CELL:         8
 
   # ===========================================================================
   # Data Converters
   # ===========================================================================
   ADC_RESOLUTION: 8
-  VOLTAGE_DAC_RESOLUTION: 1
+  VOLTAGE_DAC_RESOLUTION: FRONT_MRR_SLICE_BITS
   TEMPORAL_DAC_RESOLUTION: 1
   DAC_RESOLUTION: max(VOLTAGE_DAC_RESOLUTION, TEMPORAL_DAC_RESOLUTION)
   N_ADC_PER_BANK: N_COLUMNS

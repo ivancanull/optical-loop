@@ -35,6 +35,11 @@ class SliceChoice:
     energy_j: float
     latency_s: float
     cycles: int | None = None
+    stationarity: str = ""
+
+    @property
+    def choice_key(self) -> tuple[str, int]:
+        return self.stationarity, self.slice_bits
 
 
 @dataclass(frozen=True)
@@ -85,13 +90,23 @@ class ASWMOptimizer:
             raise ValueError("frontier_limit must be positive")
         self.frontier_limit = frontier_limit
 
-    def optimize(self, choices_by_layer: Mapping[str, Sequence[SliceChoice]]) -> tuple[ParetoState, Sequence[ParetoState]]:
+    def optimize(
+        self,
+        choices_by_layer: Mapping[str, Sequence[SliceChoice]],
+        expected_choices: set[tuple[str, int]] | None = None,
+    ) -> tuple[ParetoState, Sequence[ParetoState]]:
         layers = sorted(choices_by_layer)
         ordered_choices = []
         for layer in layers:
             choices = tuple(sorted(choices_by_layer[layer], key=lambda choice: choice.slice_bits))
-            if {choice.slice_bits for choice in choices} != set(ASWM_SLICE_BITS):
-                raise ValueError(f"Layer {layer} must have exactly 1/2/4-bit choices")
+            actual = {choice.choice_key for choice in choices}
+            expected = expected_choices or {
+                (choices[0].stationarity, bits) for bits in ASWM_SLICE_BITS
+            }
+            if actual != expected:
+                raise ValueError(
+                    f"Layer {layer} choices {sorted(actual)} do not match {sorted(expected)}"
+                )
             ordered_choices.append(choices)
         use_cycles = all(
             choice.cycles is not None
@@ -185,9 +200,10 @@ class SliceEnergyModel:
         raise ValueError(f"Unknown energy model: {model}")
 
     def adjust(self, row: Mapping[str, object], model: str, loss_db_per_stage: float) -> float:
-        slice_bits = int(row["slice_bits"])
+        slice_bits = int(row["front_mrr_slice_bits"])
         breakdown = _mapping(row.get("energy_breakdown", {}))
-        dac_energy = _component_sum(breakdown, "input_dac")
+        front_dac = "input_dac" if row.get("sliced_operand") == "input" else "weight_dac"
+        dac_energy = _component_sum(breakdown, front_dac)
         laser_energy = _component_sum(breakdown, "laser")
         primary_factor = self.dac_factor(slice_bits, "linear_bit")
         requested_factor = self.dac_factor(slice_bits, model)
@@ -237,7 +253,7 @@ class MultiSliceAnalyzer:
         workload_best = (
             aswm.sort_values("edp_j_s")
             .groupby(
-                ["network", "energy_model", "optical_loss_db_per_stage"],
+                ["network", "mapping", "energy_model", "optical_loss_db_per_stage"],
                 as_index=False,
             )
             .first()
@@ -263,19 +279,31 @@ class MultiSliceAnalyzer:
 
     @staticmethod
     def _scenario_comparison(fixed: pd.DataFrame, aswm: pd.DataFrame) -> pd.DataFrame:
-        fixed_candidates = fixed[fixed.slice_bits.isin(ASWM_SLICE_BITS)]
-        group_keys = ["network", "architecture", "energy_model", "optical_loss_db_per_stage"]
-        best_fixed = (
-            fixed_candidates.sort_values("edp_j_s")
-            .groupby(group_keys, as_index=False)
-            .first()[group_keys + ["slice_bits", "edp_j_s"]]
-            .rename(columns={"slice_bits": "best_fixed_slice_bits", "edp_j_s": "fixed_edp_j_s"})
-        )
-        comparison = aswm.merge(best_fixed, on=group_keys, validate="one_to_one")
-        comparison["aswm_reduction_vs_best_fixed"] = (
-            1 - comparison.edp_j_s / comparison.fixed_edp_j_s
-        )
-        return comparison
+        fixed_candidates = fixed[
+            fixed.front_mrr_slice_bits.isin(ASWM_SLICE_BITS)
+            & fixed.accumulation.eq("optical")
+        ]
+        rows = []
+        for adaptive in aswm.itertuples(index=False):
+            candidates = fixed_candidates[
+                (fixed_candidates.network == adaptive.network)
+                & (fixed_candidates.architecture == adaptive.architecture)
+                & (fixed_candidates.energy_model == adaptive.energy_model)
+                & (fixed_candidates.optical_loss_db_per_stage == adaptive.optical_loss_db_per_stage)
+            ]
+            if adaptive.mapping in {"ASWM-WS", "ASWM-IS"}:
+                candidates = candidates[candidates.stationarity == adaptive.stationarity]
+            elif adaptive.mapping == "Mixed-1bit":
+                candidates = candidates[candidates.front_mrr_slice_bits == 1]
+            best = candidates.sort_values("edp_j_s").iloc[0]
+            rows.append({
+                **adaptive._asdict(),
+                "best_fixed_stationarity": best.stationarity,
+                "best_fixed_slice_bits": int(best.front_mrr_slice_bits),
+                "fixed_edp_j_s": float(best.edp_j_s),
+                "aswm_reduction_vs_best_fixed": 1 - adaptive.edp_j_s / best.edp_j_s,
+            })
+        return pd.DataFrame(rows)
 
     def _modeled_rows(self, raw: pd.DataFrame) -> pd.DataFrame:
         rows = []
@@ -297,7 +325,8 @@ class MultiSliceAnalyzer:
         if modeled.empty:
             return pd.DataFrame()
         keys = [
-            "network", "architecture", "variant", "slice_bits", "energy_model",
+            "network", "architecture", "variant", "stationarity", "accumulation",
+            "sliced_operand", "front_mrr_slice_bits", "energy_model",
             "optical_loss_db_per_stage", "accuracy_status",
         ]
         rows = []
@@ -315,78 +344,112 @@ class MultiSliceAnalyzer:
         }
         osa = modeled[
             modeled.architecture.isin(candidate_architectures)
-            & modeled.slice_bits.isin(ASWM_SLICE_BITS)
+            & modeled.front_mrr_slice_bits.isin(ASWM_SLICE_BITS)
+            & modeled.accumulation.eq("optical")
         ]
         optimizer = ASWMOptimizer(self.manifest.raw["aswm"]["pareto_frontier_limit"])
         selection_rows, summary_rows, frontier_rows = [], [], []
         group_keys = ["network", "architecture", "energy_model", "optical_loss_db_per_stage"]
-        for values, group in osa.groupby(group_keys, sort=False):
-            choices_by_layer = {}
-            for layer, layer_group in group.groupby("layer"):
-                choices_by_layer[layer] = tuple(
-                    SliceChoice(
-                        layer=layer, slice_bits=int(row.slice_bits),
-                        energy_j=float(row.modeled_energy_j), latency_s=float(row.latency_s),
-                        cycles=int(row.cycles),
+
+        def optimize_scenarios(frame: pd.DataFrame, mapping: str, expected_choices) -> None:
+            for values, group in frame.groupby(group_keys, sort=False):
+                choices_by_layer = {
+                    layer: tuple(
+                        SliceChoice(
+                            layer=layer,
+                            slice_bits=int(row.front_mrr_slice_bits),
+                            energy_j=float(row.modeled_energy_j),
+                            latency_s=float(row.latency_s),
+                            cycles=int(row.cycles),
+                            stationarity=str(row.stationarity),
+                        )
+                        for row in layer_group.itertuples(index=False)
                     )
-                    for row in layer_group.itertuples(index=False)
+                    for layer, layer_group in group.groupby("layer")
+                }
+                try:
+                    best, frontier = optimizer.optimize(
+                        choices_by_layer, expected_choices=expected_choices
+                    )
+                except RuntimeError as error:
+                    raise RuntimeError(
+                        f"{error}; mapping={mapping}; scenario={dict(zip(group_keys, values))}"
+                    ) from error
+                common = {**dict(zip(group_keys, values)), "mapping": mapping}
+                for choice in best.choices:
+                    selection_rows.append({
+                        **common, "layer": choice.layer,
+                        "stationarity": choice.stationarity,
+                        "front_mrr_slice_bits": choice.slice_bits,
+                        "energy_j": choice.energy_j, "latency_s": choice.latency_s,
+                        "accuracy": float("nan"), "accuracy_status": ACCURACY_STATUS,
+                    })
+                summary_stationarity = (
+                    mapping.removeprefix("ASWM-")
+                    if mapping in {"ASWM-WS", "ASWM-IS"}
+                    else "MIXED" if mapping == "Mixed-1bit" else "JOINT"
                 )
-            try:
-                best, frontier = optimizer.optimize(choices_by_layer)
-            except RuntimeError as error:
-                raise RuntimeError(
-                    f"{error}; scenario="
-                    f"{dict(zip(group_keys, values))}"
-                ) from error
-            common = dict(zip(group_keys, values))
-            for choice in best.choices:
-                selection_rows.append({**common, "layer": choice.layer,
-                                       "slice_bits": choice.slice_bits,
-                                       "energy_j": choice.energy_j, "latency_s": choice.latency_s,
-                                       "accuracy": float("nan"), "accuracy_status": ACCURACY_STATUS})
-            summary_rows.append({**common, "mapping": "ASWM", "layers": len(best.choices),
-                                 "energy_j": best.energy_j, "latency_s": best.latency_s,
-                                 "edp_j_s": best.edp_j_s, "frontier_states": len(frontier),
-                                 "accuracy": float("nan"), "accuracy_status": ACCURACY_STATUS})
-            best_frontier_index = min(
-                range(len(frontier)), key=lambda index: frontier[index].edp_j_s
-            )
-            if len(frontier) <= PARETO_ARTIFACT_MAX_POINTS:
-                artifact_indices = range(len(frontier))
-            else:
-                artifact_indices = sorted(set(
-                    np.linspace(
+                summary_rows.append({
+                    **common, "stationarity": summary_stationarity,
+                    "layers": len(best.choices), "energy_j": best.energy_j,
+                    "latency_s": best.latency_s, "edp_j_s": best.edp_j_s,
+                    "frontier_states": len(frontier), "accuracy": float("nan"),
+                    "accuracy_status": ACCURACY_STATUS,
+                })
+                best_index = min(range(len(frontier)), key=lambda index: frontier[index].edp_j_s)
+                indices = range(len(frontier))
+                if len(frontier) > PARETO_ARTIFACT_MAX_POINTS:
+                    indices = sorted(set(np.linspace(
                         0, len(frontier) - 1, PARETO_ARTIFACT_MAX_POINTS,
                         dtype=np.int64,
-                    ).tolist() + [best_frontier_index]
-                ))
-            for index in artifact_indices:
-                state = frontier[index]
-                frontier_rows.append({**common, "frontier_index": index,
-                                      "energy_j": state.energy_j, "latency_s": state.latency_s,
-                                      "edp_j_s": state.edp_j_s,
-                                      "selected": index == best_frontier_index,
-                                      "frontier_total_states": len(frontier),
-                                      "artifact_sampled": len(frontier) > PARETO_ARTIFACT_MAX_POINTS})
+                    ).tolist() + [best_index]))
+                for index in indices:
+                    state = frontier[index]
+                    frontier_rows.append({
+                        **common, "frontier_index": index, "energy_j": state.energy_j,
+                        "latency_s": state.latency_s, "edp_j_s": state.edp_j_s,
+                        "selected": index == best_index,
+                        "frontier_total_states": len(frontier),
+                        "artifact_sampled": len(frontier) > PARETO_ARTIFACT_MAX_POINTS,
+                    })
+
+        for stationarity in ("WS", "IS"):
+            optimize_scenarios(
+                osa[osa.stationarity == stationarity],
+                f"ASWM-{stationarity}",
+                {(stationarity, bits) for bits in ASWM_SLICE_BITS},
+            )
+        optimize_scenarios(
+            osa,
+            "Joint-ASWM",
+            {(stationarity, bits) for stationarity in ("WS", "IS") for bits in ASWM_SLICE_BITS},
+        )
+        optimize_scenarios(
+            osa[osa.front_mrr_slice_bits == 1],
+            "Mixed-1bit",
+            {(stationarity, 1) for stationarity in ("WS", "IS")},
+        )
         return pd.DataFrame(selection_rows), pd.DataFrame(summary_rows), pd.DataFrame(frontier_rows)
 
     @staticmethod
     def _rankings(aswm: pd.DataFrame) -> pd.DataFrame:
         rows = []
-        for (model, loss), scenario in aswm.groupby(["energy_model", "optical_loss_db_per_stage"]):
+        for (model, loss, mapping), scenario in aswm.groupby(
+            ["energy_model", "optical_loss_db_per_stage", "mapping"]
+        ):
             for architecture, group in scenario.groupby("architecture"):
                 values = group.edp_j_s.astype(float)
                 rows.append({
                     "energy_model": model, "optical_loss_db_per_stage": loss,
-                    "architecture": architecture,
+                    "mapping": mapping, "architecture": architecture,
                     "geometric_mean_edp": math.exp(sum(map(math.log, values)) / len(values)),
                 })
         ranking = pd.DataFrame(rows)
         if not ranking.empty:
             ranking["rank"] = ranking.groupby(
-                ["energy_model", "optical_loss_db_per_stage"]
+                ["energy_model", "optical_loss_db_per_stage", "mapping"]
             ).geometric_mean_edp.rank(method="min").astype(int)
-        return ranking.sort_values(["energy_model", "optical_loss_db_per_stage", "rank"])
+        return ranking.sort_values(["energy_model", "optical_loss_db_per_stage", "mapping", "rank"])
 
     def _plots(self, raw: pd.DataFrame, fixed: pd.DataFrame, selections: pd.DataFrame, frontiers: pd.DataFrame) -> tuple[Path, ...]:
         import matplotlib.pyplot as plt
@@ -394,7 +457,7 @@ class MultiSliceAnalyzer:
         paths = []
         primary = fixed[(fixed.energy_model == "linear_bit") & (fixed.optical_loss_db_per_stage == 0)]
         if not primary.empty:
-            heat = primary.pivot_table(index="architecture", columns="slice_bits", values="edp_j_s", aggfunc="mean")
+            heat = primary.pivot_table(index=["stationarity", "architecture"], columns="front_mrr_slice_bits", values="edp_j_s", aggfunc="mean")
             axis = heat.plot.bar(logy=True, figsize=(12, 5), ylabel="Mean network EDP (J·s)")
             axis.set_title("MB-OSA EDP by core and slice width")
             plt.tight_layout(); path = self.artifacts / "edp_core_slice.png"; plt.savefig(path, dpi=160); plt.close(); paths.append(path)
@@ -403,14 +466,18 @@ class MultiSliceAnalyzer:
             axis = primary_frontier.plot.scatter(x="latency_s", y="energy_j", c="edp_j_s", logx=True, logy=True, figsize=(8, 6))
             axis.set_title("ASWM energy-delay Pareto points")
             plt.tight_layout(); path = self.artifacts / "energy_delay_pareto.png"; plt.savefig(path, dpi=160); plt.close(); paths.append(path)
-        primary_selection = selections[(selections.energy_model == "linear_bit") & (selections.optical_loss_db_per_stage == 0)]
+        primary_selection = selections[
+            (selections.energy_model == "linear_bit")
+            & (selections.optical_loss_db_per_stage == 0)
+            & selections.mapping.eq("Joint-ASWM")
+        ]
         if not primary_selection.empty:
             primary_aswm = self._aswm_results_for_plot(primary_selection)
             heat_columns = {}
             for network, network_rows in primary_aswm.groupby("network"):
                 ordered = network_rows.sort_values("layer")
                 heat_columns[network] = pd.Series(
-                    ordered.slice_bits.astype(float).to_numpy()
+                    ordered.front_mrr_slice_bits.astype(float).to_numpy()
                 )
             heat = pd.DataFrame(heat_columns)
             figure, axis = plt.subplots(figsize=(10, 7))
@@ -419,21 +486,22 @@ class MultiSliceAnalyzer:
             axis.set_ylabel("Layer index (natural manifest order)")
             axis.set_title("ASWM slice-width selections at each workload's best core")
             colorbar = figure.colorbar(image, ax=axis, ticks=[1, 2, 4])
-            colorbar.set_label("Input slice bits")
+            colorbar.set_label("Front-MRR slice bits")
             plt.tight_layout(); path = self.artifacts / "aswm_selection_heatmap.png"; plt.savefig(path, dpi=160); plt.close(); paths.append(path)
         if not raw.empty:
             component_rows = []
             for row in raw.to_dict("records"):
                 breakdown = _mapping(row.get("energy_breakdown", {}))
+                front_dac = "input_dac" if row["sliced_operand"] == "input" else "weight_dac"
                 component_rows.append({
-                    "slice_bits": row["slice_bits"],
-                    "DAC": _component_sum(breakdown, "input_dac"),
+                    "front_mrr_slice_bits": row["front_mrr_slice_bits"],
+                    "Front DAC": _component_sum(breakdown, front_dac),
                     "Laser": _component_sum(breakdown, "laser"),
                     "ADC": _component_sum(breakdown, "adc"),
                     "OSA": _component_sum(breakdown, "delay_line"),
                     "Other": max(float(row["energy_j"]) - sum(float(v) for v in breakdown.values() if isinstance(v, (int, float))), 0.0),
                 })
-            components = pd.DataFrame(component_rows).groupby("slice_bits").sum()
+            components = pd.DataFrame(component_rows).groupby("front_mrr_slice_bits").sum()
             axis = components.plot.bar(stacked=True, figsize=(9, 5), ylabel="Summed layer energy (J)")
             axis.set_title("MB-OSA component-energy sensitivity")
             plt.tight_layout(); path = self.artifacts / "component_energy_breakdown.png"; plt.savefig(path, dpi=160); plt.close(); paths.append(path)
@@ -457,26 +525,47 @@ class MultiSliceAnalyzer:
         )
 
     def _report(self, checks: pd.DataFrame, fixed: pd.DataFrame, aswm: pd.DataFrame, rankings: pd.DataFrame) -> str:
+        metadata = json.loads((self.run_dir / "run.json").read_text())
+        tier = str(metadata["tier"])
         hard_failure = bool(((checks.severity == "ERROR") & (checks.status == "FAIL")).any())
         status = "FAIL" if hard_failure else "PASS"
         primary_fixed = fixed[(fixed.energy_model == "linear_bit") & (fixed.optical_loss_db_per_stage == 0)]
         primary_aswm = aswm[(aswm.energy_model == "linear_bit") & (aswm.optical_loss_db_per_stage == 0)]
+        result_heading = (
+            "Smoke diagnostic aggregates" if tier == "smoke"
+            else "Primary-model best results"
+        )
         lines = ["# MB-OSA and ASWM Experiment Report", "", f"Overall status: **{status}**", "",
-                 "Accuracy status: **NOT_MODELED**. No accuracy constraint or claim is applied.", "",
-                 "## Primary-model best results", ""]
+                 f"Run tier: **{tier.upper()}**.", "",
+                 "Accuracy status: **NOT_MODELED**. No accuracy constraint or claim is applied.", ""]
+        if tier == "smoke":
+            lines.extend([
+                "This smoke run covers one representative layer per workload. Its aggregates "
+                "verify the native simulation and analysis path; they are not whole-network "
+                "EDP results and must not be used for research conclusions.", "",
+            ])
+        lines.extend([f"## {result_heading}", ""])
         if not primary_aswm.empty:
+            primary_comparison = self._scenario_comparison(primary_fixed, primary_aswm)
             strict_reductions = 0
-            for network, group in primary_aswm.groupby("network"):
+            for (mapping, network), group in primary_aswm.groupby(["mapping", "network"]):
                 best = group.sort_values("edp_j_s").iloc[0]
-                same_core = primary_fixed[
+                comparison = primary_comparison[
+                    (primary_comparison.mapping == mapping)
+                    & (primary_comparison.network == network)
+                    & (primary_comparison.architecture == best.architecture)
+                ].iloc[0]
+                analog_candidates = primary_fixed[
                     (primary_fixed.network == network)
                     & (primary_fixed.architecture == best.architecture)
+                    & (primary_fixed.front_mrr_slice_bits == 8)
                 ]
-                fixed_best = same_core[
-                    same_core.slice_bits.isin(ASWM_SLICE_BITS)
-                ].sort_values("edp_j_s").iloc[0]
-                analog = same_core[same_core.slice_bits == 8].iloc[0]
-                reduction = 1 - best.edp_j_s / fixed_best.edp_j_s
+                if mapping in {"ASWM-WS", "ASWM-IS"}:
+                    analog_candidates = analog_candidates[
+                        analog_candidates.stationarity == best.stationarity
+                    ]
+                analog = analog_candidates.sort_values("edp_j_s").iloc[0]
+                reduction = float(comparison.aswm_reduction_vs_best_fixed)
                 analog_change = best.edp_j_s / analog.edp_j_s - 1
                 if reduction > 1e-12:
                     strict_reductions += 1
@@ -486,7 +575,7 @@ class MultiSliceAnalyzer:
                 else:
                     outcome = "equal within numerical tolerance"
                 lines.append(
-                    f"- {network}: ASWM {best.architecture}, EDP={best.edp_j_s:.6g}; "
+                    f"- {mapping}/{network}: {best.architecture}, EDP={best.edp_j_s:.6g}; "
                     f"{outcome} versus same-core best fixed ({reduction:.3%}); "
                     f"EDP change versus analog reference={analog_change:+.3%}"
                 )
@@ -495,18 +584,24 @@ class MultiSliceAnalyzer:
                 sensitivity_reductions = int(
                     (all_scenarios.aswm_reduction_vs_best_fixed > 1e-12).sum()
                 )
+                finding_prefix = "**Smoke observation:**" if tier == "smoke" else "**Finding:**"
+                qualification = (
+                    " This is not a whole-network finding; run the full tier before making an "
+                    "adaptive-EDP claim."
+                    if tier == "smoke" else ""
+                )
                 lines.extend([
                     "",
-                    "**Finding:** ASWM does not strictly improve primary-model EDP over "
-                    "the best uniform slice width. It selects a uniform 4-bit mapping; "
-                    "therefore no adaptive-EDP improvement is claimed. Across all "
+                    f"{finding_prefix} none of the adaptive policies strictly improves primary-model "
+                    "EDP over its eligible fixed mapping; no adaptive-EDP improvement is claimed. "
+                    "Across all "
                     f"{len(all_scenarios)} core/workload/sensitivity comparisons, "
-                    f"{sensitivity_reductions} show a strict adaptive reduction.",
+                    f"{sensitivity_reductions} show a strict adaptive reduction.{qualification}",
                 ])
         lines.extend(["", "## Shared-core ranking", ""])
         primary_rank = rankings[(rankings.energy_model == "linear_bit") & (rankings.optical_loss_db_per_stage == 0)]
         for row in primary_rank.itertuples(index=False):
-            lines.append(f"- #{row.rank} {row.architecture}: geometric-mean EDP={row.geometric_mean_edp:.6g}")
+            lines.append(f"- {row.mapping} #{row.rank} {row.architecture}: geometric-mean EDP={row.geometric_mean_edp:.6g}")
         lines.extend(["", "## DAC and optical-loss sensitivity", ""])
         if not aswm.empty:
             sensitivity = aswm.groupby(
@@ -578,8 +673,16 @@ class MultiSliceValidator:
                 not failed_results and len(result_paths) == expected,
                 f"result_files={len(result_paths)}, failed={len(failed_results)}",
             ),
-            self._check("supported_slice_widths", raw.empty or set(raw.slice_bits) == {1, 2, 4, 8}, str(sorted(raw.slice_bits.unique()) if not raw.empty else [])),
-            self._check("temporal_slice_counts", raw.empty or bool((raw.temporal_slices == (8 // raw.slice_bits)).all()), "expected 8/4/2/1"),
+            self._check("supported_slice_widths", raw.empty or set(raw.front_mrr_slice_bits) == {1, 2, 4, 8}, str(sorted(raw.front_mrr_slice_bits.unique()) if not raw.empty else [])),
+            self._check("temporal_slice_counts", raw.empty or bool((raw.temporal_slices == (8 // raw.front_mrr_slice_bits)).all()), "expected 8/4/2/1"),
+            self._check(
+                "temporal_accumulation_counts",
+                raw.empty or bool(
+                    (raw.temporal_accumulations == raw.temporal_slices - 1).all()
+                    and raw.loc[raw.accumulation == "none", "temporal_accumulations"].eq(0).all()
+                ),
+                "expected 7/3/1/0",
+            ),
             self._check(
                 "accuracy_not_modeled",
                 raw.empty or bool(
@@ -592,6 +695,35 @@ class MultiSliceValidator:
             ),
         ]
         if not raw.empty:
+            component_presence_ok = True
+            for row in raw.itertuples(index=False):
+                components = set(_mapping(row.energy_breakdown))
+                has_delay = any(name == "delay_line" or name.endswith(".delay_line") for name in components)
+                has_digital = any(name == "digital_shift_add" or name.endswith(".digital_shift_add") for name in components)
+                expected_delay = row.accumulation == "optical"
+                expected_digital = row.accumulation == "digital"
+                component_presence_ok &= has_delay == expected_delay and has_digital == expected_digital
+            rows.append(self._check(
+                "accumulation_component_selection",
+                component_presence_ok,
+                "optical=delay_line, digital=digital_shift_add, 8bit=bypass",
+            ))
+            if "mapping_text" in raw and raw.mapping_text.notna().all():
+                stationarity_mapping_ok = True
+                for row in raw[raw.front_mrr_slice_bits < 8].itertuples(index=False):
+                    accumulator = "delay_line" if row.accumulation == "optical" else "digital_shift_add"
+                    section = str(row.mapping_text).split(f"{accumulator} [", 1)
+                    if len(section) != 2:
+                        stationarity_mapping_ok = False
+                        continue
+                    section = section[1].split("laser [", 1)[0]
+                    expected_dimension = "for X in" if row.stationarity == "WS" else "for Y in"
+                    stationarity_mapping_ok &= expected_dimension in section
+                rows.append(self._check(
+                    "native_mapping_stationarity",
+                    stationarity_mapping_ok,
+                    "WS accumulator traverses X; IS accumulator traverses Y",
+                ))
             expected_layers = {
                 network: {job.layer for job in expected_jobs if job.network == network}
                 for network in self.manifest.networks
@@ -654,29 +786,77 @@ class MultiSliceValidator:
                 bool((frequency_relative <= 1e-12).all()),
                 f"expected_hz={self.manifest.raw['frequency_hz']}, max_relative={frequency_relative.max():.3e}",
             ))
-            osa = raw[raw.slice_bits.isin(ASWM_SLICE_BITS)].copy()
-            osa["input_dac_energy_j"] = osa.energy_breakdown.map(
-                lambda value: _component_sum(_mapping(value), "input_dac")
+            osa = raw[
+                raw.front_mrr_slice_bits.isin(ASWM_SLICE_BITS)
+                & raw.accumulation.eq("optical")
+            ].copy()
+            osa["front_dac_energy_j"] = osa.apply(
+                lambda row: _component_sum(
+                    _mapping(row.energy_breakdown),
+                    "input_dac" if row.sliced_operand == "input" else "weight_dac",
+                ),
+                axis=1,
             )
             dac = osa.pivot(
-                index=["network", "layer", "architecture"],
-                columns="slice_bits",
-                values="input_dac_energy_j",
+                index=["network", "layer", "architecture", "stationarity"],
+                columns="front_mrr_slice_bits",
+                values="front_dac_energy_j",
             )
-            dac_ratios = dac.div(dac[1], axis=0)
-            dac_tolerance = self.manifest.raw["tolerances"]["dac_scaling_relative"]
-            dac_deviation = max(
-                float((dac_ratios[2] - 2).abs().max()),
-                float((dac_ratios[4] - 4).abs().max()),
-            )
+            dac_distinct = (dac[2] > dac[1]) & (dac[4] > dac[2])
             rows.append(self._check(
-                "native_dac_resolution_scaling",
+                "native_dac_resolution_distinct",
                 bool(
                     dac.notna().all().all()
                     and (dac > 0).all().all()
-                    and dac_deviation <= dac_tolerance * 4
+                    and dac_distinct.all()
                 ),
-                f"max_absolute_ratio_deviation={dac_deviation:.6g}",
+                f"strictly_increasing={bool(dac_distinct.all())}",
+            ))
+            osa_area = raw[raw.macro.isin(["mrr_ws_osa", "mrr_is_osa"])].copy()
+            mrr_area_rows = []
+            for row in osa_area.itertuples(index=False):
+                breakdown = _mapping(row.area_breakdown)
+                mrr_area_rows.append({
+                    "network": row.network, "layer": row.layer,
+                    "architecture": row.architecture, "stationarity": row.stationarity,
+                    "front_mrr_slice_bits": row.front_mrr_slice_bits,
+                    "input_mrr": _component_sum(breakdown, "input_mrr"),
+                    "weight_mrr": _component_sum(breakdown, "weight_mrr"),
+                })
+            mrr_areas = pd.DataFrame(mrr_area_rows)
+            area_spread = mrr_areas.groupby(
+                ["network", "layer", "architecture", "stationarity"]
+            )[["input_mrr", "weight_mrr"]].agg(lambda values: values.max() - values.min())
+            rows.append(self._check(
+                "physical_mrr_area_invariant",
+                bool((area_spread.abs() <= 1e-18).all().all()),
+                f"max_spread_mm2={area_spread.abs().max().max():.3e}",
+            ))
+            analog = raw[raw.front_mrr_slice_bits == 8]
+            analog_pivot = analog.pivot(
+                index=["network", "layer", "architecture", "stationarity"],
+                columns="macro", values=["cycles", "energy_j"],
+            )
+            analog_cycle_equal = []
+            analog_energy_relative = []
+            for stationarity, no_osa_macro, osa_macro in (
+                ("WS", "mrr_ws_no_osa", "mrr_ws_osa"),
+                ("IS", "mrr_is_no_osa", "mrr_is_osa"),
+            ):
+                stationarity_rows = analog_pivot.xs(stationarity, level="stationarity")
+                analog_cycle_equal.append(
+                    stationarity_rows["cycles"][no_osa_macro].eq(
+                        stationarity_rows["cycles"][osa_macro]
+                    ).all()
+                )
+                analog_energy_relative.extend((
+                    stationarity_rows["energy_j"][no_osa_macro]
+                    - stationarity_rows["energy_j"][osa_macro]
+                ).abs() / stationarity_rows["energy_j"][no_osa_macro].clip(lower=1e-30))
+            rows.append(self._check(
+                "analog_8bit_bypass_equivalence",
+                bool(all(analog_cycle_equal) and max(analog_energy_relative) <= 1e-12),
+                f"cycles_equal={all(analog_cycle_equal)}, max_energy_relative={max(analog_energy_relative):.3e}",
             ))
             relative = (raw.edp_j_s - raw.energy_j * raw.latency_s).abs() / raw.edp_j_s.abs().clip(lower=1e-30)
             rows.append(self._check("edp_formula", bool((relative <= self.manifest.raw["tolerances"]["edp_relative"]).all()), f"max={relative.max():.3e}"))
@@ -685,12 +865,25 @@ class MultiSliceValidator:
         if not primary_aswm.empty:
             worse = []
             for row in primary_aswm.itertuples(index=False):
-                candidates = primary_fixed[(primary_fixed.network == row.network) & (primary_fixed.architecture == row.architecture) & primary_fixed.slice_bits.isin(ASWM_SLICE_BITS)]
+                candidates = primary_fixed[
+                    (primary_fixed.network == row.network)
+                    & (primary_fixed.architecture == row.architecture)
+                    & primary_fixed.accumulation.eq("optical")
+                    & primary_fixed.front_mrr_slice_bits.isin(ASWM_SLICE_BITS)
+                ]
+                if row.mapping in {"ASWM-WS", "ASWM-IS"}:
+                    candidates = candidates[candidates.stationarity == row.stationarity]
+                elif row.mapping == "Mixed-1bit":
+                    candidates = candidates[candidates.front_mrr_slice_bits == 1]
                 if row.edp_j_s > candidates.edp_j_s.min() * (1 + 1e-12):
                     worse.append(f"{row.network}/{row.architecture}")
             rows.append(self._check("aswm_no_worse_than_fixed", not worse, f"worse={worse[:3]}"))
         if metadata["tier"] == "smoke" and not raw.empty:
-            representative = raw[raw.network == "alexnet"].set_index("slice_bits")
+            representative = raw[
+                (raw.network == "alexnet")
+                & (raw.stationarity == "WS")
+                & raw.accumulation.isin(["optical", "none"])
+            ].drop_duplicates("front_mrr_slice_bits").set_index("front_mrr_slice_bits")
             if set(representative.index) == {1, 2, 4, 8}:
                 base = float(representative.loc[1, "cycles"])
                 ratios = {bits: float(representative.loc[bits, "cycles"]) / base for bits in (1, 2, 4)}

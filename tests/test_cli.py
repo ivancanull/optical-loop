@@ -34,14 +34,14 @@ def test_layer_command_uses_layer_simulator(monkeypatch, capsys) -> None:
         network="alexnet",
         workload=None,
         layer="alexnet/0",
-        arch="proposed_mrr_optical_shift_add",
+        arch="mrr_ws_osa",
         var=[],
         system="fetch_all_lpddr4",
         tiles=1,
         pes=1,
         cols=100,
         rows=12,
-        voltage_dac_resolution=1,
+        front_mrr_slice_bits=1,
         scaling='"aggressive"',
         max_utilization=False,
         cache_results_dir=None,
@@ -56,7 +56,7 @@ def test_layer_command_uses_layer_simulator(monkeypatch, capsys) -> None:
     assert "OpticalLoop Timeloop-backed layer result" in output
     assert captured["layer"].layer_path == "alexnet/0"
     assert captured["architecture"].architecture_key == "T1, P1, C100, R12"
-    assert captured["architecture"].macro == "proposed_mrr_optical_shift_add"
+    assert captured["architecture"].macro == "mrr_ws_osa"
 
 
 def test_layer_command_accepts_generic_architecture_variables(monkeypatch, capsys) -> None:

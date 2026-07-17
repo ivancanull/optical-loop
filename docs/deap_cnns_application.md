@@ -53,7 +53,7 @@ conda run -n timeloop python optical_loop.py layer \
 
 ## Canonical Macro
 
-`workspace/models/arch/1_macro/deap_cnns/` is the only DEAP-CNNs macro. It reuses the `proposed_mrr` row/column input-sharing logic with DEAP-CNNs names and device models:
+`workspace/models/arch/1_macro/deap_cnns/` is the only DEAP-CNNs macro. It uses the same row/column optical modeling framework as the WS macros, with DEAP-CNNs names and device models:
 
 ```text
 conv_unit(N_Conv)

@@ -3,12 +3,10 @@ variables:
   # ===========================================================================
   # Specific to this architecture
   # ===========================================================================
-  N_TILES: 64
-  N_PES: 32
-  N_COLUMNS: 4
-  N_ROWS: 4
-  GLB_DEPTH_SCALE: 1
-
+  N_COLUMNS: 8
+  N_ROWS: 8
+  N_PES: 16
+  N_TILES: 1
   # ===========================================================================
   # Set by CiM Processor
   # ===========================================================================
@@ -33,13 +31,14 @@ variables:
   # ===========================================================================
   CIM_UNIT_WIDTH_CELLS:  1
   CIM_UNIT_DEPTH_CELLS:  1
-  BITS_PER_CELL:         1
+  FRONT_MRR_SLICE_BITS: 1
+  BITS_PER_CELL:         FRONT_MRR_SLICE_BITS
 
   # ===========================================================================
   # Data Converters
   # ===========================================================================
   ADC_RESOLUTION: 8
-  VOLTAGE_DAC_RESOLUTION: 1 # 1-bit DAC for input encoding
+  VOLTAGE_DAC_RESOLUTION: 8
   TEMPORAL_DAC_RESOLUTION: 1
   DAC_RESOLUTION: max(VOLTAGE_DAC_RESOLUTION, TEMPORAL_DAC_RESOLUTION)
   N_ADC_PER_BANK: N_COLUMNS
@@ -47,6 +46,7 @@ variables:
   # ===========================================================================
   # Hardware
   # ===========================================================================
-  BASE_LATENCY: 0.78E-9 # ns per cycle
-  GLOBAL_CYCLE_SECONDS: BASE_LATENCY * VOLTAGE_LATENCY_SCALE
+  BASE_LATENCY: 0.2E-9 # ns per cycle
+  LATENCY_SCALING_SCALE: 1
+  GLOBAL_CYCLE_SECONDS: BASE_LATENCY * LATENCY_SCALING_SCALE * VOLTAGE_LATENCY_SCALE
   READ_PULSE_WIDTH: GLOBAL_CYCLE_SECONDS
