@@ -1,5 +1,8 @@
 variables:
   version: 0.4
+  # Large IS convolutions have a sparse valid mapspace; 10k can terminate
+  # before the first legal mapping even though one exists.
+  MAPPER_TIMEOUT: 100000
   # ===========================================================================
   # Specific to this architecture
   # ===========================================================================

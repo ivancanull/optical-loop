@@ -7,6 +7,7 @@ import json
 import math
 import os
 import platform
+import signal
 import shutil
 import subprocess
 import sys
@@ -60,6 +61,11 @@ def _execute_native_job(
     job: ReproductionJob, system: str, frequency_hz: float
 ) -> tuple[Optional[SimulationResult], Optional[str]]:
     """Process-pool entrypoint; keep raw mapper calls inside the backend adapter."""
+    # Give each native worker and every mapper subprocess it launches a
+    # dedicated process group. The controller can then interrupt the complete
+    # tree instead of leaving a long-running mapper orphan behind.
+    if os.getsid(0) != os.getpid():
+        os.setsid()
     try:
         result = TimeloopBackend().run_layer(
             TimeloopLayerRef(network=job.network, layer_path=job.layer),
@@ -452,7 +458,13 @@ class ReproductionRunner:
         processes = getattr(executor, "_processes", None)
         if processes:
             for process in tuple(processes.values()):
-                process.terminate()
+                try:
+                    if os.getpgid(process.pid) == process.pid:
+                        os.killpg(process.pid, signal.SIGTERM)
+                    else:
+                        process.terminate()
+                except ProcessLookupError:
+                    pass
         executor.shutdown(wait=False, cancel_futures=True)
 
     def _run_job(self, job: ReproductionJob) -> dict[str, object]:

@@ -6,7 +6,7 @@ mapper:
   search_size: 10000          # Max valid mappings per-thread
   victory_condition: 100      # Exit once a mapping is better than this number of
                               # valid mappings in a row
-  timeout: 10000              # Max invalid mappings in a row
+  timeout: MAPPER_TIMEOUT     # Max consecutive invalid mappings
   max_permutations_per_if_visit: 16
   algorithm: random_pruned # linear_pruned
   max_temporal_loops_in_a_mapping: 14
