@@ -20,6 +20,10 @@ energy is scaled from one access per temporal symbol to the effective
 `N_TEMPORAL_SLICES - 1` additions. The OSA macros retain the paper delay-line
 mapping: output dimension `X` for WS and `Y` for IS.
 
+For IS, the photonic-PE level explicitly maximizes only output channel `M` and
+uses the input-reuse spatial constraint. This prevents unrelated `C/P/N` fanout
+choices and makes the input-stationary mapping visible in native loop text.
+
 ## Experiment matrix
 
 The focused full matrix contains 42,240 native mapper jobs:
@@ -61,7 +65,7 @@ constant-symbol optimistic bound, a `2^bits-1` Walden bound, and 0/0.5/1 dB
 laser compensation per optical shift stage. These are model sensitivities, not
 measured accuracy results.
 
-Validation checks exact job coverage, true mapper stationarity, temporal slice
+Validation checks exact job coverage, true mapper stationarity (including IS PE loops only over `M`), temporal slice
 and accumulation counts, correct accumulator selection, DAC resolution,
 constant MRR area/count, 8-bit bypass equivalence, units, frequency, EDP, and
 adaptive-versus-fixed dominance.

@@ -113,15 +113,17 @@ def test_four_canonical_architectures_encode_orthogonal_choices() -> None:
         assert not (root / obsolete).exists()
 
 
-def test_is_mapper_allows_sparse_valid_mapspaces() -> None:
+def test_is_mapper_has_explicit_output_channel_spatial_mapping() -> None:
     root = Path(__file__).resolve().parents[1] / "workspace/models"
     assert "timeout: MAPPER_TIMEOUT" in (root / "include/mapper.yaml").read_text()
-    for macro in ("mrr_is_no_osa", "mrr_is_osa"):
-        variables = (root / "arch/1_macro" / macro / "variables_free.yaml").read_text()
-        assert "MAPPER_TIMEOUT: 100000" in variables
-    for macro in ("mrr_ws_no_osa", "mrr_ws_osa"):
+    for macro in ("mrr_ws_no_osa", "mrr_ws_osa", "mrr_is_no_osa", "mrr_is_osa"):
         variables = (root / "arch/1_macro" / macro / "variables_free.yaml").read_text()
         assert "MAPPER_TIMEOUT: 10000" in variables
+    for macro in ("mrr_is_no_osa", "mrr_is_osa"):
+        architecture = (root / "arch/1_macro" / macro / "arch.yaml").read_text()
+        assert "maximize_dims: [[M]]" in architecture
+        photonic_pe = architecture.split("name: photonic_pe", 1)[1].split("- !Component", 1)[0]
+        assert "*spatial_must_reuse_inputs" in photonic_pe
 
 
 def test_dac_ert_contains_calibrated_slice_resolutions() -> None:

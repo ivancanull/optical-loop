@@ -10,11 +10,11 @@ accumulation are independent choices rather than encoded in historical names.
 | `mrr_is_no_osa` | Input stationary | sliced weight → 8-bit input | Digital shift-add |
 | `mrr_is_osa` | Input stationary | sliced weight → 8-bit input | Optical delay line |
 
-WS keeps weights at the weight DAC/MRR and spatially reuses inputs. Its
-accumulator traverses output dimension `X`. IS keeps inputs at the input
-DAC/MRR and spatially reuses weights. Its accumulator traverses `Y`. These
-properties must be visible in native mapper loop text.
-
+WS keeps weights at the weight DAC/MRR and uses the paper WS spatial constraints.
+Its accumulator traverses output dimension `X`. IS keeps inputs at the input
+DAC, streams sliced weights through the first MRR, and maps only output channel
+`M` across photonic PEs so those PEs reuse the stationary input. Its accumulator
+traverses `Y`. These properties must be visible in native mapper loop text.
 All macros accept the same public variables:
 
 ```text

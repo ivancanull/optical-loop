@@ -55,9 +55,10 @@ architecture:
 
   - !Container # Macro
     name: photonic_pe # long name so it doesn't conflict with other names
-    <<<: [*container_defaults]
+    <<<: [*container_defaults, *spatial_must_reuse_inputs]
     attributes: {has_power_gating: True}
-    # constraints: {spatial: {maximize_dims: [[P, Q]]}}
+    # Input-stationary PEs share one input and consume distinct output-channel weights.
+    constraints: {spatial: {maximize_dims: [[M]]}}
     spatial: {meshX: N_PES}
 
   - !Component # Input cache stores inputs

@@ -719,10 +719,18 @@ class MultiSliceValidator:
                     section = section[1].split("laser [", 1)[0]
                     expected_dimension = "for X in" if row.stationarity == "WS" else "for Y in"
                     stationarity_mapping_ok &= expected_dimension in section
+                    if row.stationarity == "IS" and row.pes > 1:
+                        pe_parts = str(row.mapping_text).split("inter_photonic_pe_spatial [", 1)
+                        if len(pe_parts) != 2:
+                            stationarity_mapping_ok = False
+                            continue
+                        pe_section = pe_parts[1].split("input_dac [", 1)[0]
+                        spatial_lines = [line for line in pe_section.splitlines() if "(Spatial-X)" in line]
+                        stationarity_mapping_ok &= bool(spatial_lines) and all("for M in" in line for line in spatial_lines)
                 rows.append(self._check(
                     "native_mapping_stationarity",
                     stationarity_mapping_ok,
-                    "WS accumulator traverses X; IS accumulator traverses Y",
+                    "WS accumulator traverses X; IS accumulator traverses Y and PE spatial loops only traverse M",
                 ))
             expected_layers = {
                 network: {job.layer for job in expected_jobs if job.network == network}
