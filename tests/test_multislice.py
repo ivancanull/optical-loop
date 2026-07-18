@@ -118,7 +118,7 @@ def test_is_mapper_has_explicit_output_channel_spatial_mapping() -> None:
     assert "timeout: MAPPER_TIMEOUT" in (root / "include/mapper.yaml").read_text()
     for macro in ("mrr_ws_no_osa", "mrr_ws_osa", "mrr_is_no_osa", "mrr_is_osa"):
         variables = (root / "arch/1_macro" / macro / "variables_free.yaml").read_text()
-        assert "MAPPER_TIMEOUT: 10000" in variables
+        assert "MAPPER_TIMEOUT: 100000" in variables
     for macro in ("mrr_is_no_osa", "mrr_is_osa"):
         architecture = (root / "arch/1_macro" / macro / "arch.yaml").read_text()
         assert "maximize_dims: [[M]]" in architecture
