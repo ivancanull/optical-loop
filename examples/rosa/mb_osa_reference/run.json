@@ -1,0 +1,298 @@
+{
+  "command": [
+    "optical_loop.py",
+    "multislice",
+    "full",
+    "--run-root",
+    "/tmp/opticalloop-wsis-full-5dfbe9a",
+    "--workers",
+    "256",
+    "--skip-notebook"
+  ],
+  "created_at": "2026-07-18T20:11:08.830763+00:00",
+  "expected_jobs": 42240,
+  "failed_jobs": 0,
+  "manifest": {
+    "accuracy_status": "NOT_MODELED",
+    "architectures": [
+      {
+        "candidate": false,
+        "cols": 9,
+        "name": "deap_high_channel",
+        "pes": 1,
+        "rows": 113,
+        "tiles": 1
+      },
+      {
+        "candidate": false,
+        "cols": 100,
+        "name": "deap_wide_kernel",
+        "pes": 1,
+        "rows": 12,
+        "tiles": 1
+      },
+      {
+        "candidate": true,
+        "cols": 4,
+        "name": "compact_4x4",
+        "pes": 64,
+        "rows": 4,
+        "tiles": 1
+      },
+      {
+        "candidate": true,
+        "cols": 4,
+        "name": "c4_r8",
+        "pes": 32,
+        "rows": 8,
+        "tiles": 1
+      },
+      {
+        "candidate": true,
+        "cols": 4,
+        "name": "c4_r16",
+        "pes": 16,
+        "rows": 16,
+        "tiles": 1
+      },
+      {
+        "candidate": true,
+        "cols": 4,
+        "name": "c4_r32",
+        "pes": 8,
+        "rows": 32,
+        "tiles": 1
+      },
+      {
+        "candidate": true,
+        "cols": 8,
+        "name": "c8_r4",
+        "pes": 32,
+        "rows": 4,
+        "tiles": 1
+      },
+      {
+        "candidate": true,
+        "cols": 8,
+        "name": "paper_optimum_8x8",
+        "pes": 16,
+        "rows": 8,
+        "tiles": 1
+      },
+      {
+        "candidate": true,
+        "cols": 8,
+        "name": "c8_r16",
+        "pes": 8,
+        "rows": 16,
+        "tiles": 1
+      },
+      {
+        "candidate": true,
+        "cols": 8,
+        "name": "c8_r32",
+        "pes": 4,
+        "rows": 32,
+        "tiles": 1
+      }
+    ],
+    "aswm": {
+      "candidate_slice_bits": [
+        1,
+        2,
+        4
+      ],
+      "candidate_stationarities": [
+        "WS",
+        "IS"
+      ],
+      "pareto_frontier_limit": 2000000,
+      "primary_energy_model": "linear_bit",
+      "primary_optical_loss_db_per_stage": 0.0
+    },
+    "constraints": {
+      "max_candidate_cols": 8,
+      "max_weight_mrrs": 1024
+    },
+    "energy_models": {
+      "conservative_walden": {
+        "description": "DAC symbol energy proportional to 2^bits - 1"
+      },
+      "linear_bit": {
+        "description": "primary: DAC symbol energy = 5.2 pJ * slice bits"
+      },
+      "optimistic_constant_symbol": {
+        "description": "constant DAC energy per temporal symbol"
+      }
+    },
+    "frequency_hz": 5000000000,
+    "name": "mb-osa-aswm",
+    "optical_loss_db_per_stage": [
+      0.0,
+      0.5,
+      1.0
+    ],
+    "quantization_bits": 8,
+    "schema_version": 1,
+    "scope": "edp-only",
+    "smoke": {
+      "architecture": "paper_optimum_8x8",
+      "layers": {
+        "alexnet": "0",
+        "gpt2_medium": "000",
+        "mobilenet_v3": "00",
+        "resnet18": "00",
+        "vgg16": "00",
+        "vision_transformer": "00"
+      }
+    },
+    "system": "fetch_all_lpddr4",
+    "technology_nm": 45,
+    "tolerances": {
+      "cycle_ratio_relative": 0.05,
+      "dac_scaling_relative": 0.05,
+      "edp_relative": 1e-09
+    },
+    "variants": {
+      "is_no_osa_1": {
+        "accumulation": "digital",
+        "front_mrr_slice_bits": 1,
+        "macro": "mrr_is_no_osa",
+        "mapping": "Digital-IS",
+        "sliced_operand": "weight",
+        "stationarity": "IS"
+      },
+      "is_no_osa_8": {
+        "accumulation": "none",
+        "front_mrr_slice_bits": 8,
+        "macro": "mrr_is_no_osa",
+        "mapping": "Analog-IS",
+        "sliced_operand": "weight",
+        "stationarity": "IS"
+      },
+      "is_osa_1": {
+        "accumulation": "optical",
+        "front_mrr_slice_bits": 1,
+        "macro": "mrr_is_osa",
+        "mapping": "MB-OSA-IS-1",
+        "sliced_operand": "weight",
+        "stationarity": "IS"
+      },
+      "is_osa_2": {
+        "accumulation": "optical",
+        "front_mrr_slice_bits": 2,
+        "macro": "mrr_is_osa",
+        "mapping": "MB-OSA-IS-2",
+        "sliced_operand": "weight",
+        "stationarity": "IS"
+      },
+      "is_osa_4": {
+        "accumulation": "optical",
+        "front_mrr_slice_bits": 4,
+        "macro": "mrr_is_osa",
+        "mapping": "MB-OSA-IS-4",
+        "sliced_operand": "weight",
+        "stationarity": "IS"
+      },
+      "is_osa_8": {
+        "accumulation": "none",
+        "front_mrr_slice_bits": 8,
+        "macro": "mrr_is_osa",
+        "mapping": "Analog-IS",
+        "sliced_operand": "weight",
+        "stationarity": "IS"
+      },
+      "ws_no_osa_1": {
+        "accumulation": "digital",
+        "front_mrr_slice_bits": 1,
+        "macro": "mrr_ws_no_osa",
+        "mapping": "Digital-WS",
+        "sliced_operand": "input",
+        "stationarity": "WS"
+      },
+      "ws_no_osa_8": {
+        "accumulation": "none",
+        "front_mrr_slice_bits": 8,
+        "macro": "mrr_ws_no_osa",
+        "mapping": "Analog-WS",
+        "sliced_operand": "input",
+        "stationarity": "WS"
+      },
+      "ws_osa_1": {
+        "accumulation": "optical",
+        "front_mrr_slice_bits": 1,
+        "macro": "mrr_ws_osa",
+        "mapping": "MB-OSA-WS-1",
+        "sliced_operand": "input",
+        "stationarity": "WS"
+      },
+      "ws_osa_2": {
+        "accumulation": "optical",
+        "front_mrr_slice_bits": 2,
+        "macro": "mrr_ws_osa",
+        "mapping": "MB-OSA-WS-2",
+        "sliced_operand": "input",
+        "stationarity": "WS"
+      },
+      "ws_osa_4": {
+        "accumulation": "optical",
+        "front_mrr_slice_bits": 4,
+        "macro": "mrr_ws_osa",
+        "mapping": "MB-OSA-WS-4",
+        "sliced_operand": "input",
+        "stationarity": "WS"
+      },
+      "ws_osa_8": {
+        "accumulation": "none",
+        "front_mrr_slice_bits": 8,
+        "macro": "mrr_ws_osa",
+        "mapping": "Analog-WS",
+        "sliced_operand": "input",
+        "stationarity": "WS"
+      }
+    },
+    "workloads": {
+      "alexnet": {
+        "expected_layers": 8,
+        "layer_glob": "workspace/models/workloads/alexnet/*.yaml"
+      },
+      "gpt2_medium": {
+        "expected_layers": 145,
+        "layer_glob": "workspace/models/workloads/gpt2_medium/*.yaml"
+      },
+      "mobilenet_v3": {
+        "expected_layers": 64,
+        "layer_glob": "workspace/models/workloads/mobilenet_v3/*.yaml"
+      },
+      "resnet18": {
+        "expected_layers": 21,
+        "layer_glob": "workspace/models/workloads/resnet18/*.yaml"
+      },
+      "vgg16": {
+        "expected_layers": 16,
+        "layer_glob": "workspace/models/workloads/vgg16/*.yaml"
+      },
+      "vision_transformer": {
+        "expected_layers": 98,
+        "layer_glob": "workspace/models/workloads/vision_transformer/*.yaml"
+      }
+    }
+  },
+  "manifest_digest": "074c6d15f742a1db9c559757d3053249b561a8819476aeaea6a30cde57d9b763",
+  "provenance": {
+    "accelergy": "0.4",
+    "git_commit": "5dfbe9ab81ff719540920f43886d0b43cf43d900",
+    "git_dirty": false,
+    "platform": "Linux-5.15.0-176-generic-x86_64-with-glibc2.35",
+    "python": "3.10.12",
+    "timeloop_mapper": "timeloop-mapper size=2035552 sha256=2ff90b894d3152e032d8fc4c0db3391c426aee28f004e2480bf70b8d111a3f33",
+    "timeloopfe": "0.4"
+  },
+  "remaining_jobs": 0,
+  "run_id": "mb-osa-aswm-full-f16d34767923b871",
+  "schema_version": 1,
+  "status": "complete",
+  "successful_jobs": 42240,
+  "tier": "full",
+  "updated_at": "2026-07-19T12:32:58.898032+00:00"
+}

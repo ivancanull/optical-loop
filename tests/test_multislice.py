@@ -213,10 +213,57 @@ def test_multislice_smoke_analysis_and_accuracy_boundary(manifest, tmp_path: Pat
     report = outputs["REPORT.md"].read_text()
     assert "Accuracy status: **NOT_MODELED**" in report
     assert "same-core best fixed" in report
+    assert "## Environment provenance" in report
+    assert "Source commit:" in report
+    assert "Jobs: 72 successful, 0 failed, 0 remaining" in report
     assert "Run tier: **SMOKE**" in report
     assert "not whole-network EDP results" in report
     metadata = json.loads((run_dir / "run.json").read_text())
     assert metadata["successful_jobs"] == 72
+
+
+def test_stationarity_validator_accepts_inactive_depthwise_pe(
+    manifest, tmp_path: Path
+) -> None:
+    run_dir = ReproductionRunner(
+        manifest, tmp_path, backend=MultiSliceFakeBackend()
+    ).run("smoke", workers=1)
+    analyzer = MultiSliceAnalyzer(manifest, run_dir)
+    raw = analyzer.raw_dataframe()
+
+    def mapping_text(row) -> str:
+        accumulator = (
+            "delay_line"
+            if row.accumulation == "optical"
+            else "digital_shift_add"
+        )
+        dimension = "X" if row.stationarity == "WS" else "Y"
+        return (
+            "inter_photonic_pe_spatial [ ]\n"
+            "input_dac [ ]\n"
+            f"{accumulator} [ ]\n| for {dimension} in [0:8)\nlaser [ ]"
+        )
+
+    raw["mapping_text"] = raw.apply(mapping_text, axis=1)
+    modeled = analyzer._modeled_rows(raw)
+    fixed = analyzer._fixed_summary(modeled)
+    selections, aswm, _ = analyzer._aswm_results(modeled)
+    validator = MultiSliceValidator(manifest, run_dir)
+    checks = validator.validate(
+        raw, modeled, fixed, selections, aswm
+    ).set_index("check")
+    assert checks.loc["native_mapping_stationarity", "status"] == "PASS"
+
+    is_row = raw.index[
+        (raw.stationarity == "IS") & (raw.front_mrr_slice_bits < 8)
+    ][0]
+    raw.loc[is_row, "mapping_text"] = raw.loc[is_row, "mapping_text"].replace(
+        "input_dac [ ]", "| for C in [0:2) (Spatial-X)\ninput_dac [ ]"
+    )
+    checks = validator.validate(
+        raw, modeled, fixed, selections, aswm
+    ).set_index("check")
+    assert checks.loc["native_mapping_stationarity", "status"] == "FAIL"
 
 
 def test_interrupted_run_records_progress_for_resume(manifest, tmp_path: Path) -> None:

@@ -538,6 +538,25 @@ class MultiSliceAnalyzer:
         lines = ["# MB-OSA and ASWM Experiment Report", "", f"Overall status: **{status}**", "",
                  f"Run tier: **{tier.upper()}**.", "",
                  "Accuracy status: **NOT_MODELED**. No accuracy constraint or claim is applied.", ""]
+        provenance = metadata.get("provenance", {})
+        lines.extend([
+            "## Environment provenance", "",
+            f"- Run ID: `{metadata.get('run_id', 'unknown')}`",
+            f"- Manifest SHA-256: `{metadata.get('manifest_digest', 'unknown')}`",
+            f"- Source commit: `{provenance.get('git_commit', 'unknown')}`",
+            f"- Timeloop mapper: {provenance.get('timeloop_mapper', 'unknown')}",
+            f"- TimeloopFE: {provenance.get('timeloopfe', 'unknown')}",
+            f"- Accelergy: {provenance.get('accelergy', 'unknown')}",
+            f"- Python: {provenance.get('python', 'unknown')}",
+            f"- Jobs: {metadata.get('successful_jobs', 0)} successful, "
+            f"{metadata.get('failed_jobs', 0)} failed, "
+            f"{metadata.get('remaining_jobs', 0)} remaining",
+            f"- Created: {metadata.get('created_at', 'unknown')}",
+            f"- Updated: {metadata.get('updated_at', 'unknown')}", "",
+        ])
+        reporting_tolerance = float(
+            self.manifest.raw["tolerances"]["edp_relative"]
+        )
         if tier == "smoke":
             lines.extend([
                 "This smoke run covers one representative layer per workload. Its aggregates "
@@ -567,22 +586,22 @@ class MultiSliceAnalyzer:
                 analog = analog_candidates.sort_values("edp_j_s").iloc[0]
                 reduction = float(comparison.aswm_reduction_vs_best_fixed)
                 analog_change = best.edp_j_s / analog.edp_j_s - 1
-                if reduction > 1e-12:
+                if reduction > reporting_tolerance:
                     strict_reductions += 1
                     outcome = "strict reduction"
-                elif reduction < -1e-12:
+                elif reduction < -reporting_tolerance:
                     outcome = "worse"
                 else:
                     outcome = "equal within numerical tolerance"
                 lines.append(
                     f"- {mapping}/{network}: {best.architecture}, EDP={best.edp_j_s:.6g}; "
-                    f"{outcome} versus same-core best fixed ({reduction:.3%}); "
+                    f"{outcome} versus same-core best fixed ({reduction:.6%}); "
                     f"EDP change versus analog reference={analog_change:+.3%}"
                 )
             if not strict_reductions:
                 all_scenarios = self._scenario_comparison(fixed, aswm)
                 sensitivity_reductions = int(
-                    (all_scenarios.aswm_reduction_vs_best_fixed > 1e-12).sum()
+                    (all_scenarios.aswm_reduction_vs_best_fixed > reporting_tolerance).sum()
                 )
                 finding_prefix = "**Smoke observation:**" if tier == "smoke" else "**Finding:**"
                 qualification = (
@@ -726,7 +745,9 @@ class MultiSliceValidator:
                             continue
                         pe_section = pe_parts[1].split("input_dac [", 1)[0]
                         spatial_lines = [line for line in pe_section.splitlines() if "(Spatial-X)" in line]
-                        stationarity_mapping_ok &= bool(spatial_lines) and all("for M in" in line for line in spatial_lines)
+                        # Depthwise/grouped layers may have M=1, so Timeloop emits no
+                        # PE spatial loop. Empty is valid; any emitted loop must still be M.
+                        stationarity_mapping_ok &= all("for M in" in line for line in spatial_lines)
                 rows.append(self._check(
                     "native_mapping_stationarity",
                     stationarity_mapping_ok,
