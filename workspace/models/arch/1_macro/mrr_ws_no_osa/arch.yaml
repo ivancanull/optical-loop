@@ -100,6 +100,26 @@ architecture:
   #       factors: []
   #       no_iteration_over_dataspaces: !nomerge [] # Overwrite default
 
+  - !Component # Electronic accumulation after per-slice ADC conversion.
+    name: digital_shift_add
+    <<<: [*component_defaults, *keep_outputs, *temporal_reuse]
+    subclass: shift_add_unit
+    enabled: N_TEMPORAL_ACCUMULATIONS > 0
+    energy_scale: N_TEMPORAL_ACCUMULATIONS / N_TEMPORAL_SLICES
+    constraints:
+      temporal:
+        maximize_dims: [[X]]
+        maximize_dims_capacity: ENCODED_OUTPUT_BITS
+        no_iteration_over_dataspaces: [Outputs, Weights]
+    attributes:
+      technology: 7
+      n_bits: ENCODED_OUTPUT_BITS
+      shift_register_n_bits: FRONT_MRR_SLICE_BITS
+      cycle_seconds: GLOBAL_CYCLE_SECONDS
+      width: ENCODED_OUTPUT_BITS
+      depth: N_ROWS
+      n_instances: N_ROWS
+
   - !Component # ADC
     name: adc
     <<<: [*component_defaults, *keep_outputs, *no_coalesce]
@@ -122,26 +142,6 @@ architecture:
     attributes:
       depth: ENCODED_OUTPUT_BITS
       width: N_ROWS
-      n_instances: N_ROWS
-
-  - !Component # Electronic accumulation used only when multiple slices exist.
-    name: digital_shift_add
-    <<<: [*component_defaults, *keep_outputs, *temporal_reuse]
-    subclass: shift_add_unit
-    enabled: N_TEMPORAL_ACCUMULATIONS > 0
-    energy_scale: N_TEMPORAL_ACCUMULATIONS / N_TEMPORAL_SLICES
-    constraints:
-      temporal:
-        maximize_dims: [[X]]
-        maximize_dims_capacity: ENCODED_OUTPUT_BITS
-        no_iteration_over_dataspaces: [Outputs, Weights]
-    attributes:
-      technology: 7
-      n_bits: ENCODED_OUTPUT_BITS
-      shift_register_n_bits: FRONT_MRR_SLICE_BITS
-      cycle_seconds: GLOBAL_CYCLE_SECONDS
-      width: ENCODED_OUTPUT_BITS
-      depth: N_ROWS
       n_instances: N_ROWS
 
   - !Component # Put laser down here -> power is proportional to the number of endpoints

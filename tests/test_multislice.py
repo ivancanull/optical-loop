@@ -100,6 +100,13 @@ def test_four_canonical_architectures_encode_orthogonal_choices() -> None:
     assert "digital_shift_add" in macros["mrr_ws_no_osa"]
     assert "digital_shift_add" in macros["mrr_is_no_osa"]
     assert "name: delay_line" not in macros["mrr_ws_no_osa"] + macros["mrr_is_no_osa"]
+    for macro in ("mrr_ws_no_osa", "mrr_is_no_osa"):
+        architecture = macros[macro]
+        # Higher Timeloop levels are physically downstream. The digital
+        # accumulator must consume converted outputs after ADC/TIA/photodiode.
+        assert architecture.index("name: digital_shift_add") < architecture.index("name: adc")
+        assert architecture.index("name: adc") < architecture.index("name: TIA")
+        assert architecture.index("name: TIA") < architecture.index("name: photodiode_output_readout")
     assert "*spatial_must_reuse_inputs" in macros["mrr_ws_osa"]
     assert "*spatial_must_reuse_weights" in macros["mrr_is_osa"]
     assert "resolution: FRONT_MRR_SLICE_BITS" in macros["mrr_is_osa"]
