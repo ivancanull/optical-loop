@@ -1,0 +1,215 @@
+{
+  "command": [
+    "-c"
+  ],
+  "created_at": "2026-07-19T14:29:45.306910+00:00",
+  "expected_jobs": 7040,
+  "failed_jobs": 0,
+  "manifest": {
+    "aggregation": {
+      "lambda": null,
+      "paper_metric": "M=(1-lambda)*G+lambda*W_max",
+      "reproducible_metric": "geometric_mean_network_edp"
+    },
+    "architectures": [
+      {
+        "candidate": false,
+        "cols": 9,
+        "name": "deap_high_channel",
+        "pes": 1,
+        "rows": 113,
+        "tiles": 1
+      },
+      {
+        "candidate": false,
+        "cols": 100,
+        "name": "deap_wide_kernel",
+        "pes": 1,
+        "rows": 12,
+        "tiles": 1
+      },
+      {
+        "candidate": true,
+        "cols": 4,
+        "name": "compact_4x4",
+        "pes": 64,
+        "rows": 4,
+        "tiles": 1
+      },
+      {
+        "candidate": true,
+        "cols": 4,
+        "name": "c4_r8",
+        "pes": 32,
+        "rows": 8,
+        "tiles": 1
+      },
+      {
+        "candidate": true,
+        "cols": 4,
+        "name": "c4_r16",
+        "pes": 16,
+        "rows": 16,
+        "tiles": 1
+      },
+      {
+        "candidate": true,
+        "cols": 4,
+        "name": "c4_r32",
+        "pes": 8,
+        "rows": 32,
+        "tiles": 1
+      },
+      {
+        "candidate": true,
+        "cols": 8,
+        "name": "c8_r4",
+        "pes": 32,
+        "rows": 4,
+        "tiles": 1
+      },
+      {
+        "candidate": true,
+        "cols": 8,
+        "name": "paper_optimum_8x8",
+        "pes": 16,
+        "rows": 8,
+        "tiles": 1
+      },
+      {
+        "candidate": true,
+        "cols": 8,
+        "name": "c8_r16",
+        "pes": 8,
+        "rows": 16,
+        "tiles": 1
+      },
+      {
+        "candidate": true,
+        "cols": 8,
+        "name": "c8_r32",
+        "pes": 4,
+        "rows": 32,
+        "tiles": 1
+      }
+    ],
+    "baselines": {
+      "compact": "compact_4x4",
+      "deap": "deap_high_channel",
+      "optimized": "paper_optimum_8x8"
+    },
+    "constraints": {
+      "max_candidate_cols": 8,
+      "max_weight_mrrs": 1024
+    },
+    "frequency_hz": 5000000000,
+    "name": "dac26-rosa-edp",
+    "paper_targets": {
+      "hybrid_edp_j_s": {
+        "reason": "paper table values are supplied without a complete accuracy-independent hybrid experiment definition",
+        "reproducible": false,
+        "values": {
+          "alexnet": {
+            "hybrid": 0.204,
+            "weight_stationary": 0.21
+          },
+          "mobilenet_v3": {
+            "hybrid": 0.026,
+            "weight_stationary": 0.03
+          },
+          "resnet18": {
+            "hybrid": 1.493,
+            "weight_stationary": 1.531
+          },
+          "vgg16": {
+            "hybrid": 118.3,
+            "weight_stationary": 121.5
+          }
+        }
+      },
+      "optimized_vs_compact_reduction": 0.26,
+      "optimized_vs_deap_reduction": 0.64,
+      "osa_optimized_ode_reduction": {
+        "reason": "raw ODE configuration/data unavailable",
+        "reproducible": false,
+        "value": 0.37
+      },
+      "osa_reduction": 0.29
+    },
+    "quantization_bits": 8,
+    "schema_version": 1,
+    "scope": "edp-only",
+    "smoke": {
+      "architecture": "paper_optimum_8x8",
+      "layers": {
+        "alexnet": "0",
+        "gpt2_medium": "000",
+        "mobilenet_v3": "00",
+        "resnet18": "00",
+        "vgg16": "00",
+        "vision_transformer": "00"
+      }
+    },
+    "system": "fetch_all_lpddr4",
+    "technology_nm": 45,
+    "tolerances": {
+      "edp_relative": 1e-09,
+      "paper_percentage_points": 0.02,
+      "reference_relative": 0.02
+    },
+    "variants": {
+      "no_osa": {
+        "macro": "mrr_ws_no_osa",
+        "output_suffix": "_1bit_input"
+      },
+      "osa": {
+        "macro": "mrr_ws_osa",
+        "output_suffix": "_1bit_input_osa"
+      }
+    },
+    "workloads": {
+      "alexnet": {
+        "expected_layers": 8,
+        "layer_glob": "workspace/models/workloads/alexnet/*.yaml"
+      },
+      "gpt2_medium": {
+        "expected_layers": 145,
+        "layer_glob": "workspace/models/workloads/gpt2_medium/*.yaml"
+      },
+      "mobilenet_v3": {
+        "expected_layers": 64,
+        "layer_glob": "workspace/models/workloads/mobilenet_v3/*.yaml"
+      },
+      "resnet18": {
+        "expected_layers": 21,
+        "layer_glob": "workspace/models/workloads/resnet18/*.yaml"
+      },
+      "vgg16": {
+        "expected_layers": 16,
+        "layer_glob": "workspace/models/workloads/vgg16/*.yaml"
+      },
+      "vision_transformer": {
+        "expected_layers": 98,
+        "layer_glob": "workspace/models/workloads/vision_transformer/*.yaml"
+      }
+    }
+  },
+  "manifest_digest": "5e015d516efe941bcec1f73d4311dd831678c6c2b0ce6f95dc2a3c417adf8d6d",
+  "provenance": {
+    "accelergy": "0.4",
+    "git_commit": "734c6d8c9a1aae5dc693007b7369b827d205883e",
+    "git_dirty": false,
+    "platform": "Linux-5.15.0-176-generic-x86_64-with-glibc2.35",
+    "python": "3.10.12",
+    "timeloop_mapper": "timeloop-mapper size=2035552 sha256=2ff90b894d3152e032d8fc4c0db3391c426aee28f004e2480bf70b8d111a3f33",
+    "timeloopfe": "0.4"
+  },
+  "remaining_jobs": 0,
+  "resumed_at": "2026-07-19T16:05:01.777477+00:00",
+  "run_id": "dac26-rosa-edp-full-f9bfa4b74ccbd731",
+  "schema_version": 1,
+  "status": "complete",
+  "successful_jobs": 7040,
+  "tier": "full",
+  "updated_at": "2026-07-19T16:08:07.933374+00:00"
+}

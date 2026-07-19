@@ -10,22 +10,23 @@ Paper readers should use the pinned Docker workflow documented in
 ```bash
 python3 optical_loop.py reproduce doctor
 python3 optical_loop.py reproduce smoke --workers 4
-python3 optical_loop.py reproduce full --workers 4
+python3 optical_loop.py reproduce full --workers 4 --max-jobs 256
 python3 optical_loop.py reproduce analyze --run-dir reproduction-runs/<run-id>
 python3 optical_loop.py reproduce validate --run-dir reproduction-runs/<run-id>
 ```
 
 `smoke` and `full` run native simulations and then analyze, validate, and
 execute the notebook. Use `--skip-notebook` only for debugging. Successful jobs
-resume by default. `--no-resume` is a safety assertion that rejects an existing
-provenance-keyed run; use it only with an unused `--run-root`.
+resume by default. `--max-jobs N` runs only the next N pending jobs and is the
+recommended full-sweep mode. `--no-resume` rejects an existing provenance-keyed
+run; use it only with an unused `--run-root`.
 
 MB-OSA and ASWM use the parallel `multislice` application:
 
 ```bash
 python3 optical_loop.py multislice doctor
 python3 optical_loop.py multislice smoke --workers 4
-python3 optical_loop.py multislice full --workers 128
+python3 optical_loop.py multislice full --workers 16 --max-jobs 256
 python3 optical_loop.py multislice analyze --run-dir multislice-runs/<run-id>
 ```
 

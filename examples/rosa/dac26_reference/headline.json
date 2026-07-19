@@ -1,0 +1,7 @@
+{
+  "available": true,
+  "winner": "paper_optimum_8x8",
+  "optimized_vs_compact_reduction": 0.3190754326696389,
+  "optimized_vs_deap_reduction": 0.4492457425164815,
+  "osa_reduction": 0.22926520230030834
+}

@@ -364,7 +364,7 @@ def _run_reproduce(args) -> None:
             raise SystemExit("Environment doctor failed; simulation was not started")
         run_dir = ReproductionRunner(manifest, args.run_root).run(
             args.action, resume=not args.no_resume, fail_fast=args.fail_fast,
-            workers=args.workers,
+            workers=args.workers, max_jobs=args.max_jobs,
         )
     else:
         if args.run_dir is None:
@@ -372,7 +372,7 @@ def _run_reproduce(args) -> None:
         run_dir = args.run_dir
 
     artifacts = ReproductionAnalyzer(manifest, run_dir).analyze(
-        execute_notebook=not args.skip_notebook
+        execute_notebook=args.action != "validate" and not args.skip_notebook
     )
     print(f"Run directory: {Path(run_dir).resolve()}")
     for name, path in artifacts.items():
@@ -402,7 +402,7 @@ def _run_multislice(args) -> None:
             args.action,
             resume=not args.no_resume,
             fail_fast=args.fail_fast,
-            workers=args.workers,
+            workers=args.workers, max_jobs=args.max_jobs,
         )
     else:
         if args.run_dir is None:
@@ -410,7 +410,7 @@ def _run_multislice(args) -> None:
         run_dir = args.run_dir
 
     outputs = MultiSliceAnalyzer(manifest, run_dir).analyze(
-        execute_notebook=not args.skip_notebook
+        execute_notebook=args.action != "validate" and not args.skip_notebook
     )
     print(f"Run directory: {Path(run_dir).resolve()}")
     for name, path in sorted(outputs.items()):
@@ -566,6 +566,10 @@ def _add_reproduce_parser(subparsers) -> None:
     parser.add_argument("--no-resume", action="store_true")
     parser.add_argument("--fail-fast", action="store_true")
     parser.add_argument("--workers", type=int, default=4)
+    parser.add_argument(
+        "--max-jobs", type=int, default=None,
+        help="Run at most this many pending jobs, then stop cleanly for deterministic batching.",
+    )
     parser.add_argument("--skip-notebook", action="store_true")
     parser.set_defaults(func=_run_reproduce)
 
@@ -581,6 +585,10 @@ def _add_multislice_parser(subparsers) -> None:
     parser.add_argument("--run-root", type=Path, default=Path("multislice-runs"))
     parser.add_argument("--run-dir", type=Path, default=None)
     parser.add_argument("--workers", type=int, default=4)
+    parser.add_argument(
+        "--max-jobs", type=int, default=None,
+        help="Run at most this many pending jobs, then stop cleanly for deterministic batching.",
+    )
     parser.add_argument("--no-resume", action="store_true")
     parser.add_argument("--fail-fast", action="store_true")
     parser.add_argument("--skip-notebook", action="store_true")

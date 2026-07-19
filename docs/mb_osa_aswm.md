@@ -37,7 +37,7 @@ structure/width modes. Run the pinned environment with:
 
 ```bash
 make multislice-smoke
-WORKERS=16 make multislice-full
+WORKERS=16 MAX_JOBS=256 make multislice-full
 ```
 
 Direct commands are:
@@ -45,13 +45,14 @@ Direct commands are:
 ```bash
 python3 optical_loop.py multislice doctor
 python3 optical_loop.py multislice smoke --workers 8
-python3 optical_loop.py multislice full --workers 16
+python3 optical_loop.py multislice full --workers 16 --max-jobs 256
 python3 optical_loop.py multislice analyze --run-dir multislice-runs/<run-id>
 python3 optical_loop.py multislice validate --run-dir multislice-runs/<run-id>
 ```
 
-Runs are immutable and resumable by run ID. Repeat the same command after an
-interruption. Do not copy checkpoint JSON between run IDs.
+Runs are immutable and resumable by run ID. `--max-jobs` selects only the next
+pending range; repeat the same command after an interruption. Do not copy
+checkpoint JSON between run IDs.
 
 ## Measured resources and runtime
 

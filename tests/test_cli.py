@@ -1,3 +1,4 @@
+import argparse
 from argparse import Namespace
 from pathlib import Path
 
@@ -131,3 +132,14 @@ def test_public_api_is_timeloop_focused() -> None:
     assert hasattr(config, "TimeloopMacroConfig")
     assert not hasattr(opticalloop, "LinearLayerConfig")
     assert not hasattr(config, "LinearLayerConfig")
+
+def test_reproduction_clis_accept_bounded_batches() -> None:
+    parser = argparse.ArgumentParser()
+    subparsers = parser.add_subparsers(dest="command", required=True)
+    optical_loop._add_reproduce_parser(subparsers)
+    optical_loop._add_multislice_parser(subparsers)
+
+    reproduce = parser.parse_args(["reproduce", "full", "--max-jobs", "256"])
+    multislice = parser.parse_args(["multislice", "full", "--max-jobs", "128"])
+    assert reproduce.max_jobs == 256
+    assert multislice.max_jobs == 128

@@ -745,38 +745,46 @@ class ReproductionValidator:
         return pd.DataFrame(rows)
 
     def _reference_check(self, aggregates: pd.DataFrame) -> dict[str, object]:
-        required = {"network", "variant", "cols", "rows", "energy_j", "latency_s", "edp_j_s"}
+        keys = ["network", "variant", "architecture", "tiles", "pes", "cols", "rows"]
+        metrics = ["energy_j", "latency_s", "edp_j_s"]
+        required = set(keys + metrics)
         if not required.issubset(aggregates.columns):
             return self._check(
                 "committed_reference_metrics", False, "ERROR",
                 f"aggregate columns missing: {sorted(required - set(aggregates.columns))}",
             )
-        reference_dir = self.manifest.repo_root / "examples/rosa/paper_edp_data"
+        path = (
+            self.manifest.repo_root
+            / "examples/rosa/dac26_reference/network_architecture_metrics.csv"
+        )
+        if not path.exists():
+            return self._check(
+                "committed_reference_metrics", False, "ERROR",
+                f"reference fixture missing: {path.relative_to(self.manifest.repo_root)}",
+            )
+        reference = pd.read_csv(path)
+        if not required.issubset(reference.columns):
+            return self._check(
+                "committed_reference_metrics", False, "ERROR",
+                f"reference columns missing: {sorted(required - set(reference.columns))}",
+            )
+        merged = reference[keys + metrics].merge(
+            aggregates[keys + metrics], on=keys, how="outer",
+            suffixes=("_reference", "_actual"), indicator=True,
+        )
+        missing = int((merged["_merge"] != "both").sum())
         relative_errors = []
-        missing = []
-        suffixes = {"no_osa": "", "osa": "_osa"}
-        for network in self.manifest.networks:
-            for variant, suffix in suffixes.items():
-                path = reference_dir / f"aggregated_metrics_{network}_1bit_input{suffix}.csv"
-                if not path.exists():
-                    missing.append(path.name)
-                    continue
-                reference = pd.read_csv(path)
-                actual = aggregates[(aggregates.network == network) & (aggregates.variant == variant)]
-                for row in reference.itertuples(index=False):
-                    selected = actual[(actual.cols == row.Cols) & (actual.rows == row.Rows)]
-                    if len(selected) != 1:
-                        missing.append(f"{network}/{variant}/C{row.Cols}R{row.Rows}")
-                        continue
-                    for actual_col, reference_value in (
-                        ("energy_j", row.Energy), ("latency_s", row.Latency), ("edp_j_s", row.EDP)
-                    ):
-                        value = float(selected.iloc[0][actual_col])
-                        relative_errors.append(abs(value - float(reference_value)) / max(abs(float(reference_value)), 1e-30))
+        matched = merged[merged["_merge"] == "both"]
+        for metric in metrics:
+            expected = matched[f"{metric}_reference"].astype(float)
+            actual = matched[f"{metric}_actual"].astype(float)
+            relative_errors.extend(
+                ((actual - expected).abs() / expected.abs().clip(lower=1e-30)).tolist()
+            )
         maximum = max(relative_errors, default=float("inf"))
         tolerance = float(self.manifest.raw["tolerances"]["reference_relative"])
         passed = not missing and maximum <= tolerance
-        detail = f"max relative error={maximum:.3%}; missing={len(missing)}"
+        detail = f"max relative error={maximum:.3%}; missing={missing}"
         return self._check("committed_reference_metrics", passed, "ERROR", detail)
 
     @staticmethod

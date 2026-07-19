@@ -26,15 +26,16 @@ paper run until every row passes.
 # Twelve jobs: one layer from each workload, with and without OSA.
 make smoke
 
-# 7,040 jobs: 352 layers x 10 architectures x 2 variants.
-WORKERS=8 make full
+# One deterministic batch of the 7,040-job full sweep; rerun until complete.
+WORKERS=8 MAX_JOBS=256 make full
 ```
 
 The smoke tier proves the native mapper-to-report-to-notebook path; it does not
 claim to reproduce network totals. Full runtime and storage depend strongly on
 the machine and mapper search behavior. Budget multiple CPU-hours and tens of
 gigabytes, begin with four workers, and increase only after observing memory
-usage. Each successful job is checkpointed, so repeating the same command
+usage. `MAX_JOBS` limits only pending jobs and exits with an `incomplete`
+state. Each successful job is checkpointed, so repeating the same command
 resumes rather than recomputes it.
 
 Every run is stored under `reproduction-runs/` with an ID derived from the
@@ -52,7 +53,8 @@ docker compose run --rm opticalloop python3 optical_loop.py reproduce validate \
   --run-dir reproduction-runs/<run-id>
 ```
 
-Both commands regenerate the executed notebook and these artifacts:
+`analyze` regenerates the executed notebook and all artifacts; `validate`
+independently regenerates tables and checks without starting Jupyter:
 
 - `layer_results.csv`: one row per successful native mapper job;
 - `network_architecture_metrics.csv`: energy, latency, and EDP totals;
