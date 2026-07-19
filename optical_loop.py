@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
+import json
 import sys
 from pathlib import Path
 from typing import Sequence
@@ -346,6 +347,20 @@ def _run_layer(args) -> None:
         print(result.mapping_text or "<no Timeloop mapping text available>")
 
 
+def _report_incomplete_batch(run_dir: Path) -> bool:
+    metadata = json.loads((Path(run_dir) / "run.json").read_text())
+    if metadata.get("status") != "incomplete":
+        return False
+    print(f"Run directory: {Path(run_dir).resolve()}")
+    print(
+        "Batch complete: "
+        f"{metadata.get('successful_jobs', 0)}/{metadata.get('expected_jobs', 0)} "
+        f"successful; {metadata.get('remaining_jobs', 0)} pending. "
+        "Repeat the same command to resume."
+    )
+    return True
+
+
 def _run_reproduce(args) -> None:
     manifest = ExperimentManifest(args.manifest, repo_root=_repo_root())
     doctor = EnvironmentDoctor(manifest)
@@ -366,6 +381,8 @@ def _run_reproduce(args) -> None:
             args.action, resume=not args.no_resume, fail_fast=args.fail_fast,
             workers=args.workers, max_jobs=args.max_jobs,
         )
+        if _report_incomplete_batch(run_dir):
+            return
     else:
         if args.run_dir is None:
             raise SystemExit(f"reproduce {args.action} requires --run-dir")
@@ -404,6 +421,8 @@ def _run_multislice(args) -> None:
             fail_fast=args.fail_fast,
             workers=args.workers, max_jobs=args.max_jobs,
         )
+        if _report_incomplete_batch(run_dir):
+            return
     else:
         if args.run_dir is None:
             raise SystemExit(f"multislice {args.action} requires --run-dir")

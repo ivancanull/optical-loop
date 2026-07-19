@@ -143,3 +143,16 @@ def test_reproduction_clis_accept_bounded_batches() -> None:
     multislice = parser.parse_args(["multislice", "full", "--max-jobs", "128"])
     assert reproduce.max_jobs == 256
     assert multislice.max_jobs == 128
+
+def test_incomplete_batch_stops_before_analysis(tmp_path: Path, capsys) -> None:
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    (run_dir / "run.json").write_text(
+        "{\"status\": \"incomplete\", \"successful_jobs\": 256, "
+        "\"expected_jobs\": 42240, \"remaining_jobs\": 41984}"
+    )
+
+    assert optical_loop._report_incomplete_batch(run_dir)
+    output = capsys.readouterr().out
+    assert "256/42240 successful" in output
+    assert "41984 pending" in output
