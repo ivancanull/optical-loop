@@ -72,6 +72,24 @@ def test_smoke_run_checkpoints_and_resumes(manifest, tmp_path: Path) -> None:
     assert backend.calls == 12
 
 
+def test_bounded_batches_resume_without_duplicate_jobs(manifest, tmp_path: Path) -> None:
+    backend = FakeBackend()
+    runner = ReproductionRunner(manifest, tmp_path, backend=backend)
+
+    run_dir = runner.run("smoke", workers=2, max_jobs=5)
+    metadata = json.loads((run_dir / "run.json").read_text())
+    assert (backend.calls, metadata["successful_jobs"], metadata["remaining_jobs"]) == (5, 5, 7)
+    assert metadata["status"] == "incomplete"
+
+    runner.run("smoke", workers=2, max_jobs=5)
+    metadata = json.loads((run_dir / "run.json").read_text())
+    assert (backend.calls, metadata["successful_jobs"], metadata["remaining_jobs"]) == (10, 10, 2)
+
+    runner.run("smoke", workers=2, max_jobs=5)
+    metadata = json.loads((run_dir / "run.json").read_text())
+    assert (backend.calls, metadata["successful_jobs"], metadata["remaining_jobs"]) == (12, 12, 0)
+    assert metadata["status"] == "complete"
+
 def test_smoke_analysis_labels_headlines_unavailable(manifest, tmp_path: Path) -> None:
     run_dir = ReproductionRunner(manifest, tmp_path, backend=FakeBackend()).run(
         "smoke", workers=2

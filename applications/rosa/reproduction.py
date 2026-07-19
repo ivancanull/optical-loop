@@ -364,9 +364,12 @@ class ReproductionRunner:
         resume: bool = True,
         fail_fast: bool = False,
         workers: int = 4,
+        max_jobs: Optional[int] = None,
     ) -> Path:
         if workers <= 0:
             raise ValueError("workers must be positive")
+        if max_jobs is not None and max_jobs <= 0:
+            raise ValueError("max_jobs must be positive")
         provenance = EnvironmentDoctor(self.manifest).provenance()
         run_id = _canonical_hash(
             {"manifest": self.manifest.digest, "tier": tier, "provenance": provenance}
@@ -391,6 +394,10 @@ class ReproductionRunner:
                 and json.loads((jobs_dir / f"{job.job_id}.json").read_text()).get("status") == "success"
             )
         ]
+        # Slice after cache filtering so each bounded batch advances to new jobs.
+        # It ends normally as "incomplete" and is safe to resume.
+        if max_jobs is not None:
+            pending = pending[:max_jobs]
         if pending and metadata.get("status") != "running":
             metadata.update({"status": "running", "resumed_at": _utc_now()})
             self._atomic_json(metadata_path, metadata)
