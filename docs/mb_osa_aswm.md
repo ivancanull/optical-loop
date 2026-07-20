@@ -56,19 +56,22 @@ checkpoint JSON between run IDs.
 
 ## Measured resources and runtime
 
-The published reference run used 256 native mapper workers. It completed all
-42,240 jobs in 16 hours, 21 minutes, and 50 seconds of recorded wall time.
-That interval includes two controller interruptions, immutable-checkpoint scans,
-and resume overhead, so it is a conservative measurement rather than a pure
-mapper-throughput benchmark. The two clean-container CI runs completed the
-72-job smoke workflow, including notebook execution, in 37 minutes 39 seconds
-and 39 minutes 33 seconds with two workers.
+The corrected published reference run used 128 native mapper workers. It
+completed all 42,240 jobs with zero failures in 9 hours, 5 minutes, and 2
+seconds of recorded simulation wall time. The run was resumed in bounded
+2,048-job ranges; this interval includes immutable-checkpoint scans and resume
+overhead, so it is a conservative measurement rather than a pure
+mapper-throughput benchmark. Rebuilding the exact Pareto analysis, figures,
+validation report, and executed notebook took approximately 12 additional
+minutes. The two clean-container CI runs completed the 72-job smoke workflow,
+including notebook execution, in 37 minutes 39 seconds and 39 minutes 33
+seconds with two workers.
 
-The completed run directory, including full analysis artifacts, occupies 1.4 GB.
-Native worker scratch from the final resume occupied another 228 MB; the
+The completed run directory occupies 1.4 GB: approximately 333 MB of raw job
+JSON, 167 MB of per-job logs, and 923 MB of full analysis artifacts. The
 committed reader summary bundle is about 15 MB. Reserve at least 4 GB beyond
 the Docker image for experiment outputs and temporary files. The exact ASWM
-Pareto analysis peaked at approximately 1.5 GB resident memory. Mapper memory
+Pareto analysis peaked at approximately 1.7 GB resident memory. Mapper memory
 scales with `WORKERS`; start with 8--16 workers unless the machine has ample
 CPU and memory, and expect lower worker counts to take proportionally longer.
 

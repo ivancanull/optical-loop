@@ -8,22 +8,22 @@ Accuracy status: **NOT_MODELED**. No accuracy constraint or claim is applied.
 
 ## Environment provenance
 
-- Run ID: `mb-osa-aswm-full-f16d34767923b871`
+- Run ID: `mb-osa-aswm-full-9d46611425c6fdee`
 - Manifest SHA-256: `074c6d15f742a1db9c559757d3053249b561a8819476aeaea6a30cde57d9b763`
-- Source commit: `5dfbe9ab81ff719540920f43886d0b43cf43d900`
+- Source commit: `451631f22bd449c693af95c256599a71346d4e74`
 - Timeloop mapper: timeloop-mapper size=2035552 sha256=2ff90b894d3152e032d8fc4c0db3391c426aee28f004e2480bf70b8d111a3f33
 - TimeloopFE: 0.4
 - Accelergy: 0.4
 - Python: 3.10.12
 - Jobs: 42240 successful, 0 failed, 0 remaining
-- Created: 2026-07-18T20:11:08.830763+00:00
-- Updated: 2026-07-19T12:32:58.898032+00:00
+- Created: 2026-07-19T16:49:03.107413+00:00
+- Updated: 2026-07-20T01:54:04.727283+00:00
 
 ## Primary-model best results
 
 - ASWM-IS/alexnet: c8_r32, EDP=0.0421984; equal within numerical tolerance versus same-core best fixed (0.000000%); EDP change versus analog reference=-45.828%
 - ASWM-IS/gpt2_medium: c8_r32, EDP=370.456; strict reduction versus same-core best fixed (0.000028%); EDP change versus analog reference=-75.669%
-- ASWM-IS/mobilenet_v3: c8_r32, EDP=0.00734855; equal within numerical tolerance versus same-core best fixed (0.000000%); EDP change versus analog reference=-49.382%
+- ASWM-IS/mobilenet_v3: c8_r32, EDP=0.00734855; equal within numerical tolerance versus same-core best fixed (-0.000000%); EDP change versus analog reference=-49.382%
 - ASWM-IS/resnet18: c8_r32, EDP=0.326034; equal within numerical tolerance versus same-core best fixed (0.000000%); EDP change versus analog reference=-36.794%
 - ASWM-IS/vgg16: c8_r32, EDP=29.2564; equal within numerical tolerance versus same-core best fixed (0.000000%); EDP change versus analog reference=-30.912%
 - ASWM-IS/vision_transformer: c8_r32, EDP=11.6504; equal within numerical tolerance versus same-core best fixed (0.000000%); EDP change versus analog reference=-77.633%

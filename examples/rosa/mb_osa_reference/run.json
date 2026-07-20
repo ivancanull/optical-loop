@@ -3,13 +3,15 @@
     "optical_loop.py",
     "multislice",
     "full",
-    "--run-root",
-    "/tmp/opticalloop-wsis-full-5dfbe9a",
     "--workers",
+    "128",
+    "--max-jobs",
     "256",
-    "--skip-notebook"
+    "--skip-notebook",
+    "--run-root",
+    "/tmp/opticalloop-multislice-corrected-451631f"
   ],
-  "created_at": "2026-07-18T20:11:08.830763+00:00",
+  "created_at": "2026-07-19T16:49:03.107413+00:00",
   "expected_jobs": 42240,
   "failed_jobs": 0,
   "manifest": {
@@ -281,7 +283,7 @@
   "manifest_digest": "074c6d15f742a1db9c559757d3053249b561a8819476aeaea6a30cde57d9b763",
   "provenance": {
     "accelergy": "0.4",
-    "git_commit": "5dfbe9ab81ff719540920f43886d0b43cf43d900",
+    "git_commit": "451631f22bd449c693af95c256599a71346d4e74",
     "git_dirty": false,
     "platform": "Linux-5.15.0-176-generic-x86_64-with-glibc2.35",
     "python": "3.10.12",
@@ -289,10 +291,11 @@
     "timeloopfe": "0.4"
   },
   "remaining_jobs": 0,
-  "run_id": "mb-osa-aswm-full-f16d34767923b871",
+  "resumed_at": "2026-07-20T01:32:07.946156+00:00",
+  "run_id": "mb-osa-aswm-full-9d46611425c6fdee",
   "schema_version": 1,
   "status": "complete",
   "successful_jobs": 42240,
   "tier": "full",
-  "updated_at": "2026-07-19T12:32:58.898032+00:00"
+  "updated_at": "2026-07-20T01:54:04.727283+00:00"
 }
