@@ -1,0 +1,13 @@
+name: optical-loop
+channels:
+  - defaults
+dependencies:
+  - python=3.10
+  - pip
+  - pip:
+      # Clone the validated `timeloop` environment first; these are the
+      # additional dependencies required by the localized accuracy runtime.
+      - omegaconf==2.3.1
+      - prettytable==3.18.0
+      - regex==2026.7.19
+      - torchvision==0.23.0

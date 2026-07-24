@@ -1,0 +1,19 @@
+layer_manifest: config/accuracy/resnet18_cifar10_layers.yaml
+initial_policy: config/accuracy/resnet18_hybrid_1bit.yaml
+model_config: config/accuracy/onnsim_resnet18_cifar10_server.yaml
+checkpoint: reference/onnsim/checkpoints/best_model_quantized_resnet18_w8b.pth
+onnsim_root: reference/onnsim
+
+trials: 20
+optimizer_seed: 0
+screening_seed: 0
+confirmation_seeds: [0, 1, 2, 3, 4]
+edp_weight: 0.5
+accuracy_weight: 0.5
+minimum_accuracy: 79.0
+thermal_std: 0.05
+thermal_reference_bits: 8
+thermal_scaling_exponent: 0.5
+dac_std: 0.02
+architecture: {tiles: 1, pes: 16, cols: 8, rows: 8}
+slice_bits: 1

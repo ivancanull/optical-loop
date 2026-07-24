@@ -119,19 +119,32 @@ def test_layer_command_rejects_malformed_variable() -> None:
         optical_loop._parse_variable_assignments(["N_COLUMNS"])
 
 
-def test_artifact_source_must_stay_inside_repo() -> None:
-    with pytest.raises(SystemExit, match="must stay inside"):
-        optical_loop._ensure_path_within_repo(
-            Path("..") / "results",
-            label="--artifact-source-results-dir",
-        )
-
-
 def test_public_api_is_timeloop_focused() -> None:
     assert hasattr(opticalloop, "TimeloopMacroConfig")
     assert hasattr(config, "TimeloopMacroConfig")
     assert not hasattr(opticalloop, "LinearLayerConfig")
     assert not hasattr(config, "LinearLayerConfig")
+
+def test_public_cli_contains_only_current_workflows() -> None:
+    parser = argparse.ArgumentParser()
+    subparsers = parser.add_subparsers(dest="command", required=True)
+    optical_loop._add_layer_parser(subparsers)
+    optical_loop._add_reproduce_parser(subparsers)
+    optical_loop._add_multislice_parser(subparsers)
+    optical_loop._add_accuracy_parser(subparsers)
+    optical_loop._add_optimize_mapping_parser(subparsers)
+
+    command_action = next(
+        action for action in parser._actions
+        if isinstance(action, argparse._SubParsersAction)
+    )
+    assert set(command_action.choices) == {
+        "layer", "reproduce", "multislice", "accuracy", "optimize-mapping"
+    }
+    with pytest.raises(SystemExit):
+        parser.parse_args(["rosa"])
+
+
 
 def test_reproduction_clis_accept_bounded_batches() -> None:
     parser = argparse.ArgumentParser()
@@ -156,3 +169,14 @@ def test_incomplete_batch_stops_before_analysis(tmp_path: Path, capsys) -> None:
     output = capsys.readouterr().out
     assert "256/42240 successful" in output
     assert "41984 pending" in output
+
+def test_make_full_targets_distinguish_complete_and_bounded_runs() -> None:
+    text = (Path(__file__).resolve().parents[1] / "Makefile").read_text()
+    full = text.split("full: image", 1)[1].split("full-batch: image", 1)[0]
+    full_batch = text.split("full-batch: image", 1)[1].split("multislice-smoke: image", 1)[0]
+    multislice = text.split("multislice-full: image", 1)[1].split("multislice-full-batch: image", 1)[0]
+    multislice_batch = text.split("multislice-full-batch: image", 1)[1]
+    assert "--max-jobs" not in full
+    assert "--max-jobs" in full_batch
+    assert "--max-jobs" not in multislice
+    assert "--max-jobs" in multislice_batch

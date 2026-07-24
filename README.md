@@ -1,321 +1,284 @@
 # OpticalLoop
 
-OpticalLoop is a **Timeloop-backed optical accelerator simulator**. Its goal is simple: keep optical computing architectures, workloads, component models, and run scripts in one self-contained repository, then use the Timeloop mapper to produce cycles, latency, energy, area, component breakdowns, and mapping text.
+OpticalLoop is a **research simulator for workload-aware, system-level evaluation of optical computing architectures**. Researchers can define their own optical modules, electronic conversion stages, memories, dataflows, quantization, and mapping constraints, then evaluate how those choices interact under real workloads.
 
-OpticalLoop **does not implement an additional analytic simulator** for energy, cycles, latency, area, or component power. All live simulation flows through:
+## Why OpticalLoop
+
+OpticalLoop emphasizes three capabilities:
+
+1. **Workload-aware mapping and scheduling.** Performance is derived from the workload shape and the mapper loop nest, so WS/IS choices, reuse, tiling, temporal slicing, and scheduling can be compared across networks and layers.
+2. **System-level performance instead of static power addition.** The model accounts for cycles, component actions, data movement, optical/electronic conversion, peripheral storage, and architecture hierarchy. This exposes ADC/DAC, accumulation, memory, and scheduling bottlenecks that a sum of static component powers cannot represent.
+3. **Noise-aware accuracy and EDP co-design.** An optional whole-network path can apply MRR thermal and DAC variations to mapped inputs or weights, report accuracy, and join it with Timeloop-derived EDP for constrained or weighted mapping search.
+
+<p align="center">
+  <a href="docs/assets/opticalloop_overview.svg">
+    <img src="docs/assets/opticalloop_overview.svg" width="820" alt="OpticalLoop overview showing workload-aware mapping, optical and electronic component models, native Timeloop and Accelergy scheduling, performance metrics, noise-aware accuracy, and design-policy evaluation.">
+  </a>
+</p>
+
+The overview connects the native performance path and optional accuracy path at
+an explicit design policy. Select the figure to inspect its full-resolution
+labels.
+
+OpticalLoop derives runtime metrics from native Timeloop/Accelergy schedules and
+component actions. Every live `SimulationResult` crosses the `TimeloopBackend`
+adapter and retains native mapper statistics and loop text; aggregate analyses
+derive from the resulting job records. The separate accuracy adapter keeps its
+model assumptions visible.
+
+## Model Definition And Included Examples
+
+Five separable concerns let a new paper or architecture reuse the same simulator:
+
+| Concern | Repository representation |
+| --- | --- |
+| Workload | Tensor dimensions and operators under `workspace/models/workloads/`. |
+| Architecture | Optical/electronic hierarchy and spatial structure in `arch.yaml`. |
+| Component actions | Accelergy tables and plug-ins for lasers, MRRs, ADC/DAC, accumulators, buffers, and memory. |
+| Mapping and scheduling | Timeloop constraints plus public variables controlling reuse, tiling, stationarity, and temporal execution. |
+| Accuracy policy | Optional layer bindings, slice widths, stationarity, and MRR variation parameters under `config/accuracy/`. |
+
+A reusable macro has the following form:
 
 ```text
-OpticalLoop CLI/Python API -> TimeloopBackend -> workspace/scripts/utils.quick_run -> Timeloop mapper
+workspace/models/arch/1_macro/<your_macro>/
+├── arch.yaml                 # hierarchy, components, dataflow constraints
+├── variables_free.yaml       # exposed design variables
+├── variables_iso.yaml        # fixed/default variables
+├── include_text_in_top.yaml  # Timeloop include boundary
+└── components/               # component action energy and area tables
+
+workspace/models/workloads/<your_network>/<layer>.yaml
 ```
 
-## Paper Reference
+### Three Design Lenses
 
-This repository accompanies the DAC 2026 manuscript:
+The examples study three independent kinds of design decisions while reusing
+the same action-based simulation path:
 
-> Huifan Zhang, Yun Hu, Caizhi Sheng, Yurui Qu, and Pingqiang Zhou. 2026.
-> *ROSA: Robust and Energy-Efficient Microring-Based Optical Neural Networks via
-> Optical Shift-and-Add and Layer-Wise Hybrid Mapping*. DAC 2026.
+| Design lens | Example | Question answered |
+| --- | --- | --- |
+| Physical fabric | DEAP-CNNs | What hardware exists? |
+| Execution mapping | ROSA WS/IS x OSA/no-OSA | How does the workload execute? |
+| Design policy | ROSA EDP-Accuracy | Which design is selected? |
 
-Find the publication record and available versions through
-[Google Scholar](https://scholar.google.com/scholar?q=%22ROSA%3A+Robust+and+Energy-Efficient+Microring-Based+Optical+Neural+Networks+via+Optical+Shift-and-Add+and+Layer-Wise+Hybrid+Mapping%22).
-See [`docs/dac26_reproduction.md`](docs/dac26_reproduction.md) for the
-independent EDP reproduction procedure and its documented paper-alignment gaps.
+Start from the example closest to the question being studied. First identify
+the variables to change, then state the boundary held fixed and inspect the
+native evidence before expanding to a sweep.
 
-## Features
+### Example 1: DEAP-CNNs — Physical-Fabric Design
 
-OpticalLoop currently provides four main capabilities:
-
-| Feature | Description |
+| Design field | This example |
 | --- | --- |
-| Generic layer simulation | Run one Timeloop mapper job from a macro, workload, and explicit variables. |
-| ROSA application | Reproduce the ROSA/CIMLoop-style MRR optical computing workflow, including OSA/no-OSA comparisons, architecture ranking, validation, and plots. |
-| WS/IS MB-OSA and ASWM | Compare four stationary/accumulation structures and select layer-wise stationarity plus 1/2/4-bit front-MRR slices. |
-| DEAP-CNNs notebook example | Run the `deap_cnns` macro through the same generic Timeloop path and inspect raw metrics, component breakdowns, and mapper loop text. |
+| **Design question** | How do the optical array shape and converter placement affect utilization, component activity, energy, and schedule? |
+| **Variables changed** | `N_Conv`, `N_ROWS`, `N_COLUMNS`, and the hierarchy of modulation, weighting, and readout devices. |
+| **Boundary held fixed** | Workloads use explicit Timeloop tensors; all execution and accounting pass through the generic `TimeloopBackend`. |
+| **Evidence to inspect** | Physical instance counts, utilization, component actions and energy, plus native mapper loop text. |
+| **Implementation** | [`deap_cnns`](workspace/models/arch/1_macro/deap_cnns/) with two recorded cases in the [DEAP-CNNs guide](docs/deap_cnns.md). |
 
-## Quick Start
+```text
+conv_unit[N_Conv]
+├── front modulation paths[N_COLUMNS]
+├── channel_weight_row[N_ROWS]
+│   └── wavelength_column[N_COLUMNS] -> weight MRR + virtual MAC
+└── photodiode -> TIA -> ADC
+```
 
-For paper readers, the supported clean-checkout path is Docker:
+This view treats an MRR accelerator first as a physical fabric: replication,
+row/column geometry, fanout, and conversion placement define the hardware that
+the mapper can use.
+
+### Example 2: ROSA — Dataflow and Accumulation Design
+
+| Design field | This example |
+| --- | --- |
+| **Design question** | With one core geometry, how do operand placement, stationarity, temporal slicing, and accumulation location change execution? |
+| **Variables changed** | WS or IS, optical or electronic accumulation, and `front_mrr_slice_bits` in `{1,2,4,8}`. |
+| **Boundary held fixed** | Each comparison keeps `N_TILES`, `N_PES`, `N_ROWS`, `N_COLUMNS`, total 8-bit operand precision, and physical MRR instances fixed. |
+| **Evidence to inspect** | Mapper-loop stationarity, temporal cycles, conversion and accumulation actions, component energy, latency, and EDP. |
+| **Implementation** | Four canonical macros documented in the [ROSA engineering guide](docs/rosa/README.md) and evaluated in the [multislice study](docs/rosa/multislice.md). |
+
+<p align="center">
+  <a href="docs/rosa/assets/rosa_system_hierarchy.png">
+    <img src="docs/rosa/assets/rosa_system_hierarchy.png" width="900" alt="ROSA system hierarchy from chip and tile organization through the photonic processing element, MRR array, optical shift-and-add path, and electronic conversion stages.">
+  </a>
+</p>
+
+The figure depicts the OSA hierarchy, where temporal partial products enter an
+optical delay-line shift-and-add path before conversion. The no-OSA structures
+move accumulation after the ADC; WS and IS retain the same core geometry while
+changing front-operand placement and stationarity.
+
+One ROSA PE contains `N_ROWS * N_COLUMNS` logical crosspoint MRRs and
+`N_COLUMNS` front modulation paths. The execution choice is factored into two
+independent axes:
+
+```text
+                              PARTIAL-PRODUCT ACCUMULATION
+                         electronic (no OSA)       optical delay line (OSA)
+                       +------------------------+--------------------------+
+weight stationary     | mrr_ws_no_osa          | mrr_ws_osa               |
+(WS: slice input)     | ADC -> digital S&A     | optical radix S&A        |
+                       +------------------------+--------------------------+
+input stationary      | mrr_is_no_osa          | mrr_is_osa               |
+(IS: slice weight)    | ADC -> digital S&A     | optical radix S&A        |
+                       +------------------------+--------------------------+
+```
+
+All four use `front_mrr_slice_bits`. Widths 1/2/4/8 produce 8/4/2/1 temporal
+slices and 7/3/1/0 accumulations while preserving the same physical core.
+
+### Example 3: ROSA — Noise-Aware Mapping Policy
+
+| Design field | This example |
+| --- | --- |
+| **Design question** | Given per-layer mapping candidates, which network policy provides the preferred EDP-accuracy tradeoff? |
+| **Variables changed** | Per-layer WS/IS choice, MRR thermal and DAC variation, accuracy constraint, and optimization objective. |
+| **Boundary held fixed** | One network-level physical core, one layer manifest, and `network EDP = sum(layer energy) * sum(layer latency)`. |
+| **Evidence to inspect** | Candidate trials, selected layer policy, Timeloop-derived network EDP, whole-network accuracy, and feasibility status. |
+| **Implementation** | The [accuracy modeling guide](docs/accuracy_modeling.md), layer-policy YAML, and online-mapping configuration. |
+
+```text
+layer policy --> native Timeloop layer results --> network EDP --+
+             +-> MRR-aware whole-network inference -> accuracy --+
+                                                                v
+                                                   feasibility + ranking
+```
+
+The implemented accuracy interface supports quantized ResNet18 with the 1-bit
+hybrid policy. Readers supply the checkpoint and CIFAR-10 dataset described in
+the accuracy guide to generate whole-network evidence. Wider 2/4/8-bit slice
+choices remain `NOT_MODELED` for accuracy and continue to carry EDP-only
+evidence.
+
+### Shared Terminology
+
+| Term | Meaning in this repository |
+| --- | --- |
+| WS | Weight stationary: the front input operand is temporally sliced; weights remain 8-bit. |
+| IS | Input stationary: the front weight operand is temporally sliced; inputs remain 8-bit. |
+| OSA | Optical shift-and-add using a delay line before electronic conversion. |
+| no-OSA | Conversion first, followed by explicit electronic shift-and-add. |
+| EDP | Network energy multiplied by network latency. |
+| ASWM | Adaptive Slice-Width Mapping over explicit per-layer candidates. |
+
+See the [modeling guide](docs/modeling.md) and [usage guide](docs/usage.md) for implementation details.
+
+## Related Papers And Repository Implementations
+
+The related work is separated by abstraction level. Architecture papers define optical accelerator organizations and dataflows; simulator and methodology papers provide the machinery used to map workloads and estimate system activity, energy, and latency.
+
+### Architecture-Level Designs
+
+| Work | Architecture contribution | Implementation in OpticalLoop | Reference |
+| --- | --- | --- | --- |
+| **ROSA** | Optical shift-and-add, robust MRR execution, and layer-wise hybrid mapping. | Primary architecture case: four WS/IS × OSA/no-OSA macros, native EDP sweeps, mapping validation, and a separate noise-aware accuracy path. | [Zhang et al., 2026](https://arxiv.org/abs/2605.00032) |
+| DEAP-CNNs | Combines digital electronics with analog photonics for convolutional neural networks. | `deap_cnns` row/column macro and two workload examples through the generic backend; scope is documented in the DEAP-CNNs guide. | [Bangari et al., 2020](https://doi.org/10.1109/JSTQE.2019.2945540) |
+
+### Simulator And Modeling Methodologies
+
+| Work | Simulator/methodology contribution | Role in OpticalLoop | Reference |
+| --- | --- | --- | --- |
+| CiMLoop | Flexible, accurate, and fast modeling for compute-in-memory accelerators. | Provides the reusable architecture/component organization, action-based accounting, mapping flow, and result aggregation that OpticalLoop extends to heterogeneous optical/electronic systems. | [Andrulis, Emer, and Sze, 2024](https://doi.org/10.1109/ISPASS61541.2024.00012) |
+| Timeloop | Systematic mapping-space exploration and performance evaluation for DNN accelerators. | Native mapping and scheduling engine behind every live performance result. | [Parashar et al., 2019](https://doi.org/10.1109/ISPASS.2019.00042) |
+| Accelergy | Architecture-level action-based energy estimation. | Component action energy/area estimation for optical, conversion, electronic, buffer, and memory hierarchy components. | [Wu, Emer, and Sze, 2019](https://doi.org/10.1109/ICCAD45719.2019.8942149) |
+
+### ROSA: Primary Paper And Implementation
+
+ROSA is the project's main paper-backed design case. The paper proposes optical shift-and-add and layer-wise hybrid mapping for robust and energy-efficient MRR neural networks. OpticalLoop represents these ideas as explicit architecture, component, workload, and mapping files rather than as copied paper constants. Find the paper through [arXiv:2605.00032](https://arxiv.org/abs/2605.00032) or [Google Scholar](https://scholar.google.com/scholar?q=%22ROSA%3A+Robust+and+Energy-Efficient+Microring-Based+Optical+Neural+Networks+via+Optical+Shift-and-Add+and+Layer-Wise+Hybrid+Mapping%22).
+
+| ROSA concept | Repository implementation | Validation status |
+| --- | --- | --- |
+| Optical shift-and-add | `mrr_ws_osa` and `mrr_is_osa` contain the optical delay-line accumulation path. | Native mapper structure, cycles, energy, and component checks pass. |
+| Electronic accumulation baseline | `mrr_ws_no_osa` and `mrr_is_no_osa` convert first and use explicit digital shift-and-add. | OSA/no-OSA and 8-bit bypass equivalence are validated. |
+| Layer-wise hybrid mapping | One layer policy selects WS or IS while retaining one network-level physical core. | Mapping stationarity is checked from mapper loop text. |
+| Robust/noise-aware execution | The optional accuracy boundary applies MRR thermal and DAC variation to the mapped operand. | The deterministic quantized-ResNet18 interface supports the 1-bit/hybrid policy; readers generate results with their checkpoint and dataset. |
+| Paper EDP comparisons | The DAC26 manifest runs 7,040 native jobs over six workloads. | `PASS_WITH_PAPER_GAPS`; undocumented inputs are reported rather than fitted. |
+| Multislice extension | The separate 42,240-job study evaluates WS/IS × OSA/no-OSA with 1/2/4/8-bit temporal symbols. | Validated extension reported separately from the original-paper results. |
+
+Evidence: [`examples/rosa/dac26_reference/REPORT.md`](examples/rosa/dac26_reference/REPORT.md), [`examples/rosa/mb_osa_reference/REPORT.md`](examples/rosa/mb_osa_reference/REPORT.md), and [`docs/accuracy_modeling.md`](docs/accuracy_modeling.md).
+
+### How To Cite ROSA
+
+```bibtex
+@misc{zhang2026rosarobustenergyefficientmicroringbased,
+  title={ROSA: Robust and Energy-Efficient Microring-Based Optical Neural Networks via Optical Shift-and-Add and Layer-Wise Hybrid Mapping},
+  author={Huifan Zhang and Yun Hu and Caizhi Sheng and Yurui Qu and Pingqiang Zhou},
+  year={2026},
+  eprint={2605.00032},
+  archivePrefix={arXiv},
+  primaryClass={cs.AR},
+  url={https://arxiv.org/abs/2605.00032},
+}
+```
+
+## How To Run
+
+The pinned Docker image is the authoritative clean-checkout environment for
+Timeloop, Accelergy, and the `layer`, `reproduce`, and `multislice` workflows:
 
 ```bash
 make doctor
+make test
 make smoke
-# Complete 7,040-job experiment:
-WORKERS=8 make full
-```
-
-Run the new multi-bit temporal-slicing study:
-
-```bash
 make multislice-smoke
-WORKERS=128 make multislice-full
 ```
 
-See [docs/mb_osa_aswm.md](docs/mb_osa_aswm.md). Accuracy is explicitly
-`NOT_MODELED`; the study reports energy, delay, and EDP only.
-The checked 42,240-job summary bundle is available under
-[`examples/rosa/mb_osa_reference`](examples/rosa/mb_osa_reference/REPORT.md).
-
-See [docs/dac26_reproduction.md](docs/dac26_reproduction.md) for runtime,
-resume, artifact, validation, and paper-gap details. The container pins the
-complete native Timeloop/Accelergy environment by immutable image digest.
-
-Use the existing `timeloop` conda environment for live simulation:
+After defining `my_optical_core` and `my_network/0`, run one mapping and inspect the real loop nest:
 
 ```bash
-conda run -n timeloop python optical_loop.py --help
-```
-
-No editable package install is required. `optical_loop.py` bootstraps the local `opticalloop` package from this repository.
-The Conda path is a developer convenience and is not the authoritative paper
-reproduction environment.
-
-Run tests:
-
-```bash
-python -m pytest -q
-```
-
-## Generic Layer Simulation
-
-The most general entrypoint is `layer`. You can directly specify a macro, workload, and Timeloop variables:
-
-```bash
-conda run -n timeloop python optical_loop.py layer \
-  --arch deap_cnns \
-  --workload deap_deepbench/bench0 \
-  --var N_COLUMNS=100 \
-  --var N_ROWS=12 \
-  --var N_Conv=1 \
+docker compose run --rm opticalloop python3 optical_loop.py layer \
+  --arch my_optical_core \
+  --workload my_network/0 \
+  --var MY_CORE_ROWS=16 \
+  --var MY_CORE_COLUMNS=16 \
   --show-mapping
 ```
 
-`--show-mapping` prints the Timeloop mapper loop text, which is useful for checking the actual dataflow.
-
-For ROSA/MRR-style macros, you can also use the shape shorthand:
+Run complete or explicitly bounded validation studies only when needed:
 
 ```bash
-conda run -n timeloop python optical_loop.py layer \
-  --arch mrr_ws_osa \
-  --workload alexnet/0 \
-  --tiles 1 \
-  --pes 1 \
-  --cols 100 \
-  --rows 12
+WORKERS=8 make full
+WORKERS=8 MAX_JOBS=256 make full-batch
+WORKERS=16 make multislice-full
+WORKERS=16 MAX_JOBS=256 make multislice-full-batch
 ```
 
-Common options:
+The separate `optical-loop` Conda environment supports the optional
+PyTorch/CUDA accuracy runtime. Performance reproduction remains anchored to the
+pinned Docker image and requires no editable parent-repository packages.
 
-| Option | Meaning |
+### CLI Migration
+
+| Former command | Current workflow |
 | --- | --- |
-| `--arch` | Timeloop macro name, such as `deap_cnns`, `mrr_ws_osa`, or `mrr_is_osa`. |
-| `--workload` | Workload path, such as `alexnet/0` or `deap_deepbench/bench0`. |
-| `--var KEY=VALUE` | Variable passed directly to Timeloop. May be repeated. |
-| `--tiles --pes --cols --rows` | Convenience shape options for MRR-style architectures. |
-| `--front-mrr-slice-bits` | Temporal symbol width at the first MRR stage: 1, 2, 4, or 8. |
-| `--system` | System wrapper. Defaults to `fetch_all_lpddr4`. |
-| `--show-mapping` | Print Timeloop mapper text. |
+| `rosa --stage paper-edp` or `rosa --stage all` | `reproduce full`, followed by `reproduce analyze` or `reproduce validate` for an existing run. |
+| `rosa --stage hybrid` | `multislice full` for WS/IS slice studies, or `optimize-mapping` for the implemented accuracy-aware policy. |
+| `rosa --stage report` | Read the committed `dac26_reference/REPORT.md` or `mb_osa_reference/REPORT.md`. |
 
-## ROSA Reproduction
-
-ROSA is the only formal application workflow in this repository. Its code lives in `applications/rosa/`.
-
-Read the committed reference artifacts and print the headline report:
-
-```bash
-conda run -n timeloop python optical_loop.py rosa --stage report
-```
-
-Validate the committed artifacts:
-
-```bash
-conda run -n timeloop python optical_loop.py rosa --stage validate
-```
-
-Recompute the DAC26 EDP-only comparisons from all six committed workload
-aggregates:
-
-```bash
-conda run -n timeloop python optical_loop.py rosa --stage paper-edp
-```
-
-The executable notebook is
-`examples/rosa/dac26_edp_reproduction.ipynb`; its complete experiment manifest
-is `examples/rosa/paper_edp_config.yaml`. The paper's robust aggregate includes
-an undocumented `lambda`, so the notebook reports the directly reproducible
-geometric mean alongside the published targets rather than fitting that value.
-
-Current reference checks:
-
-| Check | Expected |
-| --- | --- |
-| AlexNet OSA best | `T1,P1,C100,R12`, EDP `0.0810225695` |
-| Six-network OSA winner | `T1, P32, C8, R4`, score `0.8529673580` |
-
-Rerun the full ROSA Timeloop workflow:
-
-```bash
-conda run -n timeloop python optical_loop.py rosa --mode rerun --stage all --preset rosa-full
-```
-
-Run only the hybrid mapping workflow:
-
-```bash
-conda run -n timeloop python optical_loop.py rosa --mode rerun --stage hybrid --hybrid-family both
-```
-
-ROSA lightweight artifacts are stored in:
-
-```text
-examples/rosa/results/
-examples/rosa/plots/
-```
-
-## DEAP-CNNs Example
-
-DEAP-CNNs is **not a separate application workflow**. It is a notebook example showing how to run an optical computing macro directly with the generic `TimeloopMacroConfig` and `TimeloopBackend`.
-
-Notebook:
-
-```text
-examples/deap_cnns/deap_cnns_reproduction.ipynb
-```
-
-It contains two cases:
-
-| Case | Workload | Variables |
-| --- | --- | --- |
-| `R=10, D=12` | `deap_deepbench/bench0` | `N_COLUMNS=100`, `N_ROWS=12`, `N_Conv=1` |
-| `R=3, D=113` | `deap_deepbench/bench1` | `N_COLUMNS=9`, `N_ROWS=113`, `N_Conv=1` |
-
-Equivalent CLI commands:
-
-```bash
-conda run -n timeloop python optical_loop.py layer --arch deap_cnns \
-  --workload deap_deepbench/bench0 --var N_COLUMNS=100 --var N_ROWS=12 --var N_Conv=1
-
-conda run -n timeloop python optical_loop.py layer --arch deap_cnns \
-  --workload deap_deepbench/bench1 --var N_COLUMNS=9 --var N_ROWS=113 --var N_Conv=1
-```
-
-Raw Timeloop metrics, component power/energy/area rows, and mapper loop text for these two cases are recorded in `docs/deap_cnns_timeloop_data.md`.
-
-## Python API
-
-Generic Timeloop run:
-
-```python
-import optical_loop  # bootstraps local opticalloop package
-from opticalloop import TimeloopBackend, TimeloopLayerRef, TimeloopMacroConfig
-
-layer = TimeloopLayerRef(
-    network="deap_deepbench",
-    layer_path="deap_deepbench/bench0",
-)
-
-architecture = TimeloopMacroConfig(
-    macro="deap_cnns",
-    system="fetch_all_lpddr4",
-    variables={"N_COLUMNS": 100, "N_ROWS": 12, "N_Conv": 1},
-    max_utilization=False,
-)
-
-result = TimeloopBackend().run_layer(layer, architecture)
-print(result.energy_j, result.latency_s)
-print(result.mapping_text)
-```
-
-MRR-style convenience config:
-
-```python
-import optical_loop
-from opticalloop import LayerSimulator, MRRMacroConfig, TimeloopLayerRef
-
-layer = TimeloopLayerRef(network="alexnet", layer_path="alexnet/0")
-architecture = MRRMacroConfig(
-    n_tiles=1,
-    n_pes=1,
-    n_cols=100,
-    n_rows=12,
-    macro="mrr_ws_osa",
-    max_utilization=False,
-)
-
-result = LayerSimulator(layer=layer, architecture=architecture).run()
-```
-
-## Repo Structure
-
-| Path | Description |
-| --- | --- |
-| `optical_loop.py` | CLI entrypoint. |
-| `backend.py` | Timeloop adapter and the only live mapper call boundary. |
-| `config/` | Macro and workload config dataclasses. |
-| `result.py` | `SimulationResult`, including Timeloop stats and mapping text. |
-| `simulator/` | Single-layer simulation facade. |
-| `workflow/results.py` | CSV writing, reconstruction, and aggregation utilities. |
-| `module_data.py` | Tidy module-level energy, area, and power rows. |
-| `applications/rosa/` | ROSA application workflow. |
-| `examples/` | ROSA artifacts and the DEAP-CNNs notebook example. |
-| `workspace/` | Vendored Timeloop models, components, workloads, and scripts. |
-| `docs/` | Detailed documentation. |
-| `tests/` | Unit and integration-style checks. |
+The public CLI consists of `layer`, `reproduce`, `multislice`, `accuracy`, and
+`optimize-mapping`.
 
 ## Documentation Map
 
 | Document | Purpose |
 | --- | --- |
-| `docs/simulator_overview.md` | Core simulator architecture and Timeloop boundary. |
-| `docs/cli_and_api.md` | CLI and Python API usage. |
-| `docs/rosa_application.md` | ROSA workflow, validation, and rerun commands. |
-| `docs/deap_cnns_application.md` | DEAP-CNNs generic notebook example. |
-| `docs/deap_cnns_timeloop_data.md` | Raw DEAP-CNNs Timeloop layer data and mapping text. |
-| `docs/macro_dataflow_mapping.md` | Macro-to-dataflow correspondence for ROSA and DEAP-CNNs. |
-| `docs/results_and_artifacts.md` | Result artifact meanings and validation formulas. |
-| `docs/development_guidelines.md` | OOP, KISS, adapter-boundary, and cleanup rules. |
-| `docs/dac26_reproduction.md` | Clean-checkout native simulation and validation guide. |
-| `docs/mb_osa_aswm.md` | MB-OSA hardware assumptions, ASWM policy, and experiment guide. |
+| [Modeling guide](docs/modeling.md) | Architecture hierarchy, component actions, Timeloop boundary, and canonical MRR dataflows. |
+| [Usage guide](docs/usage.md) | CLI, Python API, run directories, reference bundles, and result schemas. |
+| [ROSA engineering guide](docs/rosa/README.md) | MRR geometry, four mappings, temporal slicing, system activity, validation, and figures. |
+| [DAC26 experiment](docs/rosa/dac26.md) | Clean-checkout EDP sweep, resume, analysis, and paper-gap interpretation. |
+| [Multislice experiment](docs/rosa/multislice.md) | WS/IS multi-bit matrix, ASWM analysis, resources, and validation. |
+| [Accuracy modeling](docs/accuracy_modeling.md) | Implemented ResNet18 MRR variation interface and online mapping boundary. |
+| [DEAP-CNNs example](docs/deap_cnns.md) | Macro definition, two workloads, native metrics, and mapper loop text. |
+| [Development guidelines](docs/development_guidelines.md) | OOP, KISS, adapter boundaries, and test expectations. |
 
-## Included Macros
+## Model Boundaries
 
-The main optical macros live in `workspace/models/arch/1_macro/`:
-
-| Macro | Purpose |
+| Area | Repository boundary |
 | --- | --- |
-| `mrr_ws_no_osa` | Weight-stationary, front input slices, electronic accumulation. |
-| `mrr_ws_osa` | Weight-stationary, front input slices, optical accumulation. |
-| `mrr_is_no_osa` | Input-stationary, front weight slices, electronic accumulation. |
-| `mrr_is_osa` | Input-stationary, front weight slices, optical accumulation. |
-| `deap_cnns` | DEAP-CNNs notebook macro using the same row/column optical modeling framework. |
+| Performance | Native Timeloop and Accelergy provide cycles, activity, energy, latency, and area. |
+| Accuracy | The implemented accuracy path covers quantized ResNet18 with the documented 1-bit hybrid policy. Wider slice widths remain `NOT_MODELED`. |
+| Generated data | Full run trees stay in ignored runtime directories; compact validated reference bundles are committed. |
+| Publications | ROSA is cited through arXiv and Google Scholar. The repository tracks engineering PNG assets rather than manuscript TeX or complete paper PDFs. |
 
-## Correctness And Hygiene
-
-Recommended checks after changes:
-
-```bash
-python -m pytest -q
-python optical_loop.py rosa --stage report
-python optical_loop.py rosa --stage validate
-```
-
-Optional live Timeloop smoke:
-
-```bash
-conda run -n timeloop python optical_loop.py layer \
-  --arch deap_cnns \
-  --workload deap_deepbench/bench0 \
-  --var N_COLUMNS=100 \
-  --var N_ROWS=12 \
-  --var N_Conv=1 \
-  --show-mapping
-```
-
-Portability check: scan README, docs, examples, applications, and workspace to ensure there are no machine-specific absolute paths or parent-result dependencies. CI/test scripts should follow the same hygiene rule.
-
-## What Is Not Included
-
-- No local analytic simulator for energy, latency, cycles, area, or component power.
-- No PyTorch accuracy/noise/robustness experiments.
-- No committed full `results/` tree.
-- No committed `paper/` or `reference/` PDFs.
-
-Generated local context such as `results/`, `paper/`, `reference/`, `temp/`, and `workspace/outputs/` is ignored by git.
+Generated local context such as `results/`, `paper/`, `reference/`, `temp/`, and `workspace/outputs/` remains outside version control.

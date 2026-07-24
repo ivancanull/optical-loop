@@ -32,31 +32,26 @@ def _bootstrap_local_package() -> None:
 _bootstrap_local_package()
 
 from opticalloop import (  # noqa: E402
+    AccuracyExperimentConfig,
     LayerSimulator,
     MRRMacroConfig,
     TimeloopBackend,
     TimeloopLayerRef,
     TimeloopMacroConfig,
     TimeloopResultCache,
+    LayerManifest,
+    LayerPolicy,
+    MRRVariationConfig,
 )
+from opticalloop.accuracy.adapters import ONNSimAccuracyBackend  # noqa: E402
 from opticalloop.applications.rosa import (  # noqa: E402
-    FINAL_ARTIFACTS,
-    RosaResultValidator,
-    PaperEDPConfig,
-    PaperEDPReproduction,
     EnvironmentDoctor,
     ExperimentManifest,
+    MultiSliceAnalyzer,
     ReproductionAnalyzer,
     ReproductionRunner,
-    MultiSliceAnalyzer,
-    default_rosa_workflow,
-    parse_architecture_argument,
-    write_reference_artifacts,
+    run_online_mapping,
 )
-
-
-def _parse_networks(value: str) -> Sequence[str]:
-    return tuple(part.strip() for part in value.split(",") if part.strip())
 
 
 def _parse_cli_value(value: str) -> object:
@@ -91,191 +86,13 @@ def _parse_variable_assignments(assignments: Sequence[str]) -> dict[str, object]
 def _infer_network_from_workload(workload: str) -> str:
     if "/" not in workload:
         raise SystemExit(
-            "--network is required when --workload does not include a network prefix"
+            "--network is required when --workload lacks a network prefix"
         )
     return workload.split("/", 1)[0]
 
 
 def _repo_root() -> Path:
     return Path(__file__).resolve().parent
-
-
-def _ensure_path_within_repo(path: Path, *, label: str) -> Path:
-    repo_root = _repo_root().resolve()
-    resolved = Path(path).resolve()
-    if resolved != repo_root and repo_root not in resolved.parents:
-        raise SystemExit(
-            f"{label} must stay inside the OpticalLoop repository: {path.as_posix()}"
-        )
-    return path
-
-
-def _source_has_artifacts(path: Path) -> bool:
-    return all(
-        (path / source_relative_path).exists() or (path / output_name).exists()
-        for output_name, source_relative_path in FINAL_ARTIFACTS.items()
-    )
-
-
-def _default_artifact_source_results_dir() -> Path:
-    for candidate in (
-        Path("results"),
-        Path("examples/rosa/results"),
-    ):
-        if _source_has_artifacts(candidate):
-            return candidate
-    return Path("results")
-
-
-def _has_full_cache_report(results_dir: Path) -> bool:
-    return (
-        results_dir
-        / "reconstructed"
-        / "aggregated_metrics_alexnet_1bit_input_osa.csv"
-    ).exists()
-
-
-def _artifact_cache_report(results_dir: Path):
-    alexnet_path = results_dir / "aggregated_metrics_alexnet_1bit_input_osa.csv"
-    ranking_path = (
-        results_dir
-        / "aggregated_architecture_scores_1bit_input_osa_all_cached_networks.csv"
-    )
-    if not alexnet_path.exists() or not ranking_path.exists():
-        missing = alexnet_path if not alexnet_path.exists() else ranking_path
-        raise FileNotFoundError(missing)
-
-    alexnet = pd.read_csv(alexnet_path)
-    best_osa = alexnet.sort_values("EDP", kind="mergesort").iloc[0]
-    ranking = pd.read_csv(ranking_path)
-    best_ranking = ranking.sort_values("Rank", kind="mergesort").iloc[0]
-    return {
-        "alexnet_osa_best": {
-            "architecture": (
-                f"T{int(best_osa['Tiles'])},P{int(best_osa['PEs'])},"
-                f"C{int(best_osa['Cols'])},R{int(best_osa['Rows'])}"
-            ),
-            "edp": float(best_osa["EDP"]),
-            "energy": float(best_osa["Energy"]),
-            "latency": float(best_osa["Latency"]),
-        },
-        "six_network_osa_best": {
-            "architecture": str(best_ranking["Architecture"]),
-            "aggregated_score": float(best_ranking["Aggregated_Score"]),
-            "rank": int(best_ranking["Rank"]),
-        },
-    }
-
-
-def _print_rosa_report(report) -> None:
-    alexnet = report["alexnet_osa_best"]
-    ranking = report["six_network_osa_best"]
-    print("OpticalLoop ROSA cached report")
-    print(
-        "AlexNet OSA best: "
-        f"{alexnet['architecture']} EDP={alexnet['edp']:.10f} "
-        f"Energy={alexnet['energy']:.6e} Latency={alexnet['latency']:.6e}"
-    )
-    print(
-        "Six-network OSA best: "
-        f"{ranking['architecture']} score={ranking['aggregated_score']:.10f} "
-        f"rank={ranking['rank']}"
-    )
-
-
-def _write_validation_report(results_dir: Path, report_path: Path) -> None:
-    validator = RosaResultValidator(results_dir)
-    report = validator.validate()
-    report_path.parent.mkdir(parents=True, exist_ok=True)
-    report.to_csv(report_path, index=False)
-    failed = report[~report["passed"]]
-    if not failed.empty:
-        raise SystemExit(
-            "Validation failed; see "
-            f"{report_path.as_posix()} for {len(failed)} failing checks"
-        )
-    print(f"Validation passed ({len(report)} checks); wrote {report_path.as_posix()}")
-
-
-def _run_rosa(args) -> None:
-    workflow = default_rosa_workflow(
-        results_dir=args.results_dir,
-        networks=_parse_networks(args.networks),
-        n_jobs=args.n_jobs,
-    )
-
-    if args.mode == "cache" and args.stage in {"run", "hybrid"}:
-        raise SystemExit("cache mode cannot run live Timeloop stages; use --mode rerun")
-
-    if args.stage in {"paper-edp", "all"}:
-        reproduction = PaperEDPReproduction(
-            PaperEDPConfig(data_dir=args.paper_edp_data_dir)
-        )
-        summary = reproduction.headline_summary()
-        print("DAC26 EDP-only reproduction (committed Timeloop aggregates)")
-        print(f"No-OSA winner: {summary['best_no_osa']}")
-        print(
-            "Optimized reduction vs compact / DEAP: "
-            f"{summary['optimized_vs_compact_reduction']:.1%} / "
-            f"{summary['optimized_vs_deap_reduction']:.1%}"
-        )
-        print(
-            "OSA reduction at optimized shape: "
-            f"{summary['osa_reduction_at_optimized_shape']:.1%}"
-        )
-        print("Paper targets: 26% / 64% / 29% (37% with optimized ODE)")
-
-    if args.stage in {"run", "all"} and args.mode == "rerun":
-        workflow.run_sweeps()
-
-    if args.stage in {"aggregate", "all"}:
-        workflow.reconstruct_and_aggregate()
-
-    if args.stage in {"rank", "all"}:
-        ranking = workflow.rank_osa_architectures()
-        best = ranking.iloc[0]
-        print(
-            "Wrote OSA ranking; best architecture: "
-            f"{best['Architecture']} score={best['Aggregated_Score']:.10f}"
-        )
-
-    if args.stage in {"hybrid", "all"} and args.mode == "rerun":
-        architecture = parse_architecture_argument(args.hybrid_architecture)
-        outputs = workflow.run_hybrid(
-            family=args.hybrid_family,
-            architecture=architecture,
-        )
-        print(f"Wrote {len(outputs)} hybrid workflow artifact groups")
-
-    if args.stage in {"report", "all"}:
-        if _has_full_cache_report(workflow.results_dir):
-            _print_rosa_report(workflow.cache_report())
-        else:
-            _print_rosa_report(_artifact_cache_report(args.artifact_results_dir))
-
-    if args.stage in {"artifacts", "all"}:
-        source_results_dir = (
-            args.artifact_source_results_dir or _default_artifact_source_results_dir()
-        )
-        source_results_dir = _ensure_path_within_repo(
-            source_results_dir,
-            label="--artifact-source-results-dir",
-        )
-        outputs = write_reference_artifacts(
-            source_results_dir=source_results_dir,
-            output_results_dir=args.artifact_results_dir,
-            output_plots_dir=args.artifact_plots_dir,
-        )
-        print(
-            "Wrote lightweight artifacts from "
-            f"{source_results_dir.as_posix()}: {len(outputs)} files"
-        )
-
-    if args.stage in {"validate", "all"}:
-        report_path = args.validation_report or (
-            args.artifact_results_dir / "validation_report.csv"
-        )
-        _write_validation_report(args.artifact_results_dir, report_path)
 
 
 def _run_layer(args) -> None:
@@ -304,7 +121,7 @@ def _run_layer(args) -> None:
         if any(value is not None for value in (args.tiles, args.pes, args.cols, args.rows)):
             raise SystemExit(
                 "Use either --var for a generic macro or all MRR shape options "
-                "without --var; do not mix the two forms."
+                "without --var; choose one form."
             )
         architecture = TimeloopMacroConfig(
             macro=args.arch,
@@ -439,80 +256,57 @@ def _run_multislice(args) -> None:
         raise SystemExit(1)
 
 
-def _add_rosa_parser(subparsers) -> None:
-    parser = subparsers.add_parser(
-        "rosa",
-        help="Run the ROSA application workflow.",
-    )
-    parser.add_argument("--mode", choices=("cache", "rerun"), default="cache")
-    parser.add_argument(
-        "--stage",
-        choices=(
-            "report",
-            "run",
-            "aggregate",
-            "rank",
-            "hybrid",
-            "validate",
-            "artifacts",
-            "paper-edp",
-            "all",
-        ),
-        default="report",
-    )
-    parser.add_argument("--preset", choices=("rosa-full",), default="rosa-full")
-    parser.add_argument("--results-dir", type=Path, default=Path("results"))
-    parser.add_argument(
-        "--paper-edp-data-dir",
-        type=Path,
-        default=Path("examples/rosa/paper_edp_data"),
-        help="Committed six-workload no-OSA/OSA Timeloop aggregate directory.",
-    )
-    parser.add_argument(
-        "--networks",
-        type=str,
-        default="alexnet,vgg16,resnet18,mobilenet_v3,gpt2_medium,vision_transformer",
-    )
-    parser.add_argument("--n-jobs", type=int, default=128)
-    parser.add_argument(
-        "--hybrid-family",
-        choices=("osa", "delay-line", "both"),
-        default="both",
-    )
-    parser.add_argument(
-        "--hybrid-architecture",
-        type=str,
-        default="T1, P16, C8, R8",
-        help="Hybrid architecture as 'T1, P16, C8, R8' or '1,16,8,8'.",
-    )
-    parser.add_argument(
-        "--artifact-source-results-dir",
-        type=Path,
-        default=None,
-        help=(
-            "In-repo source Timeloop result tree for lightweight artifacts. "
-            "Defaults to results, then examples/rosa/results."
+def _run_accuracy(args) -> None:
+    manifest = LayerManifest.load(args.layer_manifest)
+    policy = LayerPolicy.load(args.policy, manifest)
+    seeds = tuple(args.seed + index for index in range(args.runs))
+    experiment = AccuracyExperimentConfig(
+        network=manifest.network,
+        dataset=manifest.dataset,
+        checkpoint=args.checkpoint,
+        model_config=args.model_config,
+        runs=args.runs,
+        seeds=seeds,
+        variation=MRRVariationConfig(
+            thermal_std=args.thermal_std,
+            dac_std=args.dac_std,
+            thermal_scaling_exponent=args.thermal_scaling_exponent,
+            thermal_reference_bits=args.thermal_reference_bits,
         ),
     )
-    parser.add_argument(
-        "--artifact-results-dir",
-        type=Path,
-        default=Path("examples/rosa/results"),
-        help="Portable ROSA CSV artifact output directory.",
-    )
-    parser.add_argument(
-        "--artifact-plots-dir",
-        type=Path,
-        default=Path("examples/rosa/plots"),
-        help="Portable ROSA PNG artifact output directory.",
-    )
-    parser.add_argument(
-        "--validation-report",
-        type=Path,
-        default=None,
-        help="Validation report path. Defaults to <artifact-results-dir>/validation_report.csv.",
-    )
-    parser.set_defaults(func=_run_rosa)
+    result = ONNSimAccuracyBackend(args.onnsim_root).run(experiment, policy)
+    payload = {
+        **result.to_row(),
+        "accuracies": result.accuracies,
+        "losses": result.losses,
+        "seeds": result.seeds,
+        "baseline_accuracy": result.baseline_accuracy,
+        "metadata": dict(result.metadata),
+    }
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    args.output.write_text(json.dumps(payload, indent=2))
+    print("OpticalLoop ONNSim accuracy result")
+    print(f"Network:        {result.network}")
+    print(f"Scenario:       {result.scenario}")
+    print(f"Accuracy:       {result.accuracy_mean:.4f}% +/- {result.accuracy_std:.4f}%")
+    print(f"Accuracy delta: {result.accuracy_delta:.4f}%")
+    print(f"Wrote:          {args.output}")
+
+
+def _run_optimize_mapping(args) -> None:
+    result = run_online_mapping(args.config, args.output_dir)
+    print("OpticalLoop online WS/IS mapping optimization")
+    print(f"Status:     {result['status']}")
+    print(f"Trials:     {result['trials']}")
+    if result["status"] == "success":
+        selected = result["selected_result"]
+        print(f"Policy:     {result['selected_policy_key']}")
+        print(f"Score:      {result['selected_score']:.8f}")
+        print(f"EDP:        {selected['edp_j_s']:.6e} J*s")
+        print(f"Accuracy:   {selected['accuracy']:.4f}%")
+    else:
+        print("No candidate satisfied the configured accuracy floor.")
+    print(f"Artifacts:  {Path(args.output_dir).resolve()}")
 
 
 def _add_layer_parser(subparsers) -> None:
@@ -571,47 +365,92 @@ def _add_layer_parser(subparsers) -> None:
     parser.set_defaults(func=_run_layer)
 
 
-def _add_reproduce_parser(subparsers) -> None:
-    parser = subparsers.add_parser(
-        "reproduce", help="Run and verify the clean-checkout DAC26 EDP experiment."
-    )
-    parser.add_argument("action", choices=("doctor", "smoke", "full", "analyze", "validate"))
+def _add_experiment_parser(
+    subparsers, *, name: str, help_text: str, manifest: Path,
+    run_root: Path, handler,
+) -> None:
+    """Register the shared native-simulation experiment interface."""
+    parser = subparsers.add_parser(name, help=help_text)
     parser.add_argument(
-        "--manifest", type=Path,
-        default=Path("examples/rosa/dac26_edp_manifest.yaml"),
+        "action", choices=("doctor", "smoke", "full", "analyze", "validate")
     )
-    parser.add_argument("--run-root", type=Path, default=Path("reproduction-runs"))
+    parser.add_argument("--manifest", type=Path, default=manifest)
+    parser.add_argument("--run-root", type=Path, default=run_root)
     parser.add_argument("--run-dir", type=Path, default=None)
-    parser.add_argument("--no-resume", action="store_true")
-    parser.add_argument("--fail-fast", action="store_true")
     parser.add_argument("--workers", type=int, default=4)
     parser.add_argument(
         "--max-jobs", type=int, default=None,
-        help="Run at most this many pending jobs, then stop cleanly for deterministic batching.",
+        help="Run at most this many pending jobs, then stop for deterministic batching.",
     )
+    parser.add_argument("--no-resume", action="store_true")
+    parser.add_argument("--fail-fast", action="store_true")
     parser.add_argument("--skip-notebook", action="store_true")
-    parser.set_defaults(func=_run_reproduce)
+    parser.set_defaults(func=handler)
+
+
+def _add_reproduce_parser(subparsers) -> None:
+    _add_experiment_parser(
+        subparsers,
+        name="reproduce",
+        help_text="Run and verify the clean-checkout DAC26 EDP experiment.",
+        manifest=Path("examples/rosa/dac26_edp_manifest.yaml"),
+        run_root=Path("reproduction-runs"),
+        handler=_run_reproduce,
+    )
 
 
 def _add_multislice_parser(subparsers) -> None:
+    _add_experiment_parser(
+        subparsers,
+        name="multislice",
+        help_text="Run WS/IS multi-slice mapping experiments.",
+        manifest=Path("examples/rosa/mb_osa_manifest.yaml"),
+        run_root=Path("multislice-runs"),
+        handler=_run_multislice,
+    )
+
+
+def _add_accuracy_parser(subparsers) -> None:
     parser = subparsers.add_parser(
-        "multislice", help="Run MB-OSA and Adaptive Slice-Width Mapping experiments."
+        "accuracy", help="Run optional whole-network accuracy through ONNSim."
     )
-    parser.add_argument("action", choices=("doctor", "smoke", "full", "analyze", "validate"))
+    parser.add_argument("--layer-manifest", type=Path, required=True)
+    parser.add_argument("--policy", type=Path, required=True)
+    parser.add_argument("--checkpoint", type=Path, required=True)
+    parser.add_argument("--model-config", type=Path, required=True)
     parser.add_argument(
-        "--manifest", type=Path, default=Path("examples/rosa/mb_osa_manifest.yaml")
+        "--onnsim-root", type=Path, default=Path("reference/onnsim")
     )
-    parser.add_argument("--run-root", type=Path, default=Path("multislice-runs"))
-    parser.add_argument("--run-dir", type=Path, default=None)
-    parser.add_argument("--workers", type=int, default=4)
+    parser.add_argument("--runs", type=int, default=5)
+    parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--thermal-std", type=float, default=0.05)
+    parser.add_argument("--thermal-scaling-exponent", type=float, default=0.5)
     parser.add_argument(
-        "--max-jobs", type=int, default=None,
-        help="Run at most this many pending jobs, then stop cleanly for deterministic batching.",
+        "--thermal-reference-bits", type=int, choices=(1, 2, 4, 8), default=8
     )
-    parser.add_argument("--no-resume", action="store_true")
-    parser.add_argument("--fail-fast", action="store_true")
-    parser.add_argument("--skip-notebook", action="store_true")
-    parser.set_defaults(func=_run_multislice)
+    parser.add_argument("--dac-std", type=float, default=0.02)
+    parser.add_argument(
+        "--output", type=Path, default=Path("results/accuracy/onnsim.json")
+    )
+    parser.set_defaults(func=_run_accuracy)
+
+
+def _add_optimize_mapping_parser(subparsers) -> None:
+    parser = subparsers.add_parser(
+        "optimize-mapping",
+        help="Online WS/IS mapping search using Timeloop EDP and ONNSim accuracy.",
+    )
+    parser.add_argument(
+        "--config",
+        type=Path,
+        default=Path("config/optimization/resnet18_online.yaml"),
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=Path("results/optimization/resnet18"),
+    )
+    parser.set_defaults(func=_run_optimize_mapping)
 
 
 def main() -> None:
@@ -620,9 +459,10 @@ def main() -> None:
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
     _add_layer_parser(subparsers)
-    _add_rosa_parser(subparsers)
     _add_reproduce_parser(subparsers)
     _add_multislice_parser(subparsers)
+    _add_accuracy_parser(subparsers)
+    _add_optimize_mapping_parser(subparsers)
     args = parser.parse_args()
     args.func(args)
 

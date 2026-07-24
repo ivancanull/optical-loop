@@ -7,12 +7,28 @@ from opticalloop.config.workload import TimeloopLayerRef
 from opticalloop.module_data import ModuleSimulationData, module_dataframe
 from opticalloop.result import SimulationResult
 from opticalloop.simulator.layer_simulator import LayerSimulator
+from opticalloop.accuracy import (
+    AccuracyBackend,
+    AccuracyExperimentConfig,
+    AccuracyResult,
+    LayerManifest,
+    LayerPolicy,
+    MRRVariationConfig,
+    attach_accuracy,
+)
 
 __all__ = [
     "ArchitectureMetric",
+    "AccuracyBackend",
+    "AccuracyExperimentConfig",
+    "AccuracyResult",
     "LayerSimulator",
+    "LayerManifest",
+    "LayerPolicy",
     "MRRMacroConfig",
     "ModuleSimulationData",
+    "MRRVariationConfig",
+    "attach_accuracy",
     "SimulationResult",
     "TimeloopBackend",
     "TimeloopLayerRef",

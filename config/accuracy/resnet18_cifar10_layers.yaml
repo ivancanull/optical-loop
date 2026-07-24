@@ -1,0 +1,24 @@
+network: resnet18
+dataset: cifar10
+layers:
+  - {id: "00", workload: resnet18/00, torch_module: conv1}
+  - {id: "01", workload: resnet18/01, torch_module: layer1.0.conv1}
+  - {id: "02", workload: resnet18/02, torch_module: layer1.0.conv2}
+  - {id: "03", workload: resnet18/03, torch_module: layer1.1.conv1}
+  - {id: "04", workload: resnet18/04, torch_module: layer1.1.conv2}
+  - {id: "05", workload: resnet18/05, torch_module: layer2.0.conv1}
+  - {id: "06", workload: resnet18/06, torch_module: layer2.0.conv2}
+  - {id: "07", workload: resnet18/07, torch_module: layer2.0.downsample.0}
+  - {id: "08", workload: resnet18/08, torch_module: layer2.1.conv1}
+  - {id: "09", workload: resnet18/09, torch_module: layer2.1.conv2}
+  - {id: "10", workload: resnet18/10, torch_module: layer3.0.conv1}
+  - {id: "11", workload: resnet18/11, torch_module: layer3.0.conv2}
+  - {id: "12", workload: resnet18/12, torch_module: layer3.0.downsample.0}
+  - {id: "13", workload: resnet18/13, torch_module: layer3.1.conv1}
+  - {id: "14", workload: resnet18/14, torch_module: layer3.1.conv2}
+  - {id: "15", workload: resnet18/15, torch_module: layer4.0.conv1}
+  - {id: "16", workload: resnet18/16, torch_module: layer4.0.conv2}
+  - {id: "17", workload: resnet18/17, torch_module: layer4.0.downsample.0}
+  - {id: "18", workload: resnet18/18, torch_module: layer4.1.conv1}
+  - {id: "19", workload: resnet18/19, torch_module: layer4.1.conv2}
+  - {id: "20", workload: resnet18/20, torch_module: classifier.1}
