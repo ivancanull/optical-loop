@@ -7,6 +7,7 @@ import json
 import math
 import os
 import platform
+import signal
 import shutil
 import subprocess
 import sys
@@ -47,18 +48,32 @@ class ReproductionJob:
     pes: int
     cols: int
     rows: int
+    stationarity: str
+    accumulation: str
+    sliced_operand: str
+    front_mrr_slice_bits: int
+    temporal_slices: int
+    temporal_accumulations: int
+    radix: int
 
 
 def _execute_native_job(
-    job: ReproductionJob, system: str
+    job: ReproductionJob, system: str, frequency_hz: float
 ) -> tuple[Optional[SimulationResult], Optional[str]]:
     """Process-pool entrypoint; keep raw mapper calls inside the backend adapter."""
+    # Give each native worker and every mapper subprocess it launches a
+    # dedicated process group. The controller can then interrupt the complete
+    # tree instead of leaving a long-running mapper orphan behind.
+    if os.getsid(0) != os.getpid():
+        os.setsid()
     try:
         result = TimeloopBackend().run_layer(
             TimeloopLayerRef(network=job.network, layer_path=job.layer),
             MRRMacroConfig(
                 n_tiles=job.tiles, n_pes=job.pes, n_cols=job.cols, n_rows=job.rows,
                 macro=job.macro, system=system, max_utilization=False,
+                front_mrr_slice_bits=job.front_mrr_slice_bits,
+                frequency_hz=frequency_hz,
             ),
         )
         return result, None
@@ -94,7 +109,9 @@ class ExperimentManifest:
             raise ValueError(f"Expected one architecture named {name!r}")
         return matches[0]
 
-    def jobs(self, tier: str) -> tuple[ReproductionJob, ...]:
+    def jobs(
+        self, tier: str, *, manifest_digest: Optional[str] = None
+    ) -> tuple[ReproductionJob, ...]:
         if tier not in {"smoke", "full"}:
             raise ValueError(f"Unknown reproduction tier: {tier}")
         architectures = self.raw["architectures"]
@@ -109,13 +126,22 @@ class ExperimentManifest:
                 if not smoke_path.exists():
                     raise ValueError(f"Smoke layer does not exist: {layers[0]}")
             for variant, variant_spec in self.raw["variants"].items():
+                slice_bits = int(variant_spec.get("front_mrr_slice_bits", 1))
+                if slice_bits not in {1, 2, 4, 8}:
+                    raise ValueError(f"Unsupported slice width for {variant}: {slice_bits}")
                 for architecture in architectures:
                     for layer in layers:
                         identity = {
-                            "manifest": self.digest,
+                            # Validation of an existing immutable run uses the
+                            # digest recorded when that run was created. This
+                            # permits analysis-only settings (such as a larger
+                            # exact-frontier safety cap) to evolve without
+                            # relabeling native mapper checkpoints.
+                            "manifest": manifest_digest or self.digest,
                             "network": network,
                             "layer": layer,
                             "variant": variant,
+                            "slice_bits": slice_bits,
                             "architecture": architecture["name"],
                         }
                         jobs.append(
@@ -130,6 +156,13 @@ class ExperimentManifest:
                                 pes=int(architecture["pes"]),
                                 cols=int(architecture["cols"]),
                                 rows=int(architecture["rows"]),
+                                stationarity=str(variant_spec.get("stationarity", "WS")),
+                                accumulation=str(variant_spec.get("accumulation", "none")),
+                                sliced_operand=str(variant_spec.get("sliced_operand", "input")),
+                                front_mrr_slice_bits=slice_bits,
+                                temporal_slices=(8 + slice_bits - 1) // slice_bits,
+                                temporal_accumulations=(8 + slice_bits - 1) // slice_bits - 1,
+                                radix=2 ** slice_bits,
                             )
                         )
         return tuple(jobs)
@@ -164,6 +197,29 @@ class ExperimentManifest:
                 )
         if sum(spec["expected_layers"] for spec in self.raw["workloads"].values()) != 352:
             raise ValueError("DAC26 manifest must contain exactly 352 workload layers")
+        if "aswm" in self.raw:
+            variants = self.raw["variants"]
+            expected_widths = {
+                "mrr_ws_no_osa": {1, 8}, "mrr_is_no_osa": {1, 8},
+                "mrr_ws_osa": {1, 2, 4, 8}, "mrr_is_osa": {1, 2, 4, 8},
+            }
+            actual_widths = {
+                macro: {
+                    int(spec["front_mrr_slice_bits"])
+                    for spec in variants.values() if spec["macro"] == macro
+                }
+                for macro in expected_widths
+            }
+            if actual_widths != expected_widths or len(variants) != 12:
+                raise ValueError(
+                    f"MB-OSA variants must encode the 12-mode focused matrix: {actual_widths}"
+                )
+            for spec in variants.values():
+                expected_operand = "input" if spec["stationarity"] == "WS" else "weight"
+                if spec["sliced_operand"] != expected_operand:
+                    raise ValueError(
+                        f"{spec['stationarity']} must slice the front {expected_operand} operand"
+                    )
 
 
 class EnvironmentDoctor:
@@ -230,7 +286,8 @@ class EnvironmentDoctor:
         if completed.returncode == 0 and output:
             return output[0]
         stat = Path(path).stat()
-        return f"{Path(path).resolve()} size={stat.st_size}"
+        digest = hashlib.sha256(Path(path).read_bytes()).hexdigest()
+        return f"{Path(path).name} size={stat.st_size} sha256={digest}"
 
     @staticmethod
     def _package_version(package: str) -> Optional[str]:
@@ -307,9 +364,12 @@ class ReproductionRunner:
         resume: bool = True,
         fail_fast: bool = False,
         workers: int = 4,
+        max_jobs: Optional[int] = None,
     ) -> Path:
         if workers <= 0:
             raise ValueError("workers must be positive")
+        if max_jobs is not None and max_jobs <= 0:
+            raise ValueError("max_jobs must be positive")
         provenance = EnvironmentDoctor(self.manifest).provenance()
         run_id = _canonical_hash(
             {"manifest": self.manifest.digest, "tier": tier, "provenance": provenance}
@@ -334,6 +394,13 @@ class ReproductionRunner:
                 and json.loads((jobs_dir / f"{job.job_id}.json").read_text()).get("status") == "success"
             )
         ]
+        # Slice after cache filtering so each bounded batch advances to new jobs.
+        # It ends normally as "incomplete" and is safe to resume.
+        if max_jobs is not None:
+            pending = pending[:max_jobs]
+        if pending and metadata.get("status") != "running":
+            metadata.update({"status": "running", "resumed_at": _utc_now()})
+            self._atomic_json(metadata_path, metadata)
         executor_type = ThreadPoolExecutor if self.backend is not None else ProcessPoolExecutor
         # A caller-supplied backend is primarily a test/embedding seam and may
         # not be picklable. Production native runs use processes because YAML
@@ -344,10 +411,17 @@ class ReproductionRunner:
             injected_backend = None
         else:
             executor_type = ThreadPoolExecutor
-        with executor_type(max_workers=workers) as executor:
+        executor = executor_type(max_workers=workers)
+        futures = {}
+        try:
             if injected_backend is None:
                 futures = {
-                    executor.submit(_execute_native_job, job, self.manifest.raw["system"]): job
+                    executor.submit(
+                        _execute_native_job,
+                        job,
+                        self.manifest.raw["system"],
+                        float(self.manifest.raw["frequency_hz"]),
+                    ): job
                     for job in pending
                 }
             else:
@@ -369,8 +443,36 @@ class ReproductionRunner:
                     for remaining in futures:
                         remaining.cancel()
                     break
+        except KeyboardInterrupt:
+            for future in futures:
+                future.cancel()
+            self._stop_executor(executor)
+            self._record_progress(
+                metadata_path, metadata, jobs_dir, jobs, status="interrupted"
+            )
+            raise
+        else:
+            executor.shutdown(wait=True)
         self._finalize(metadata_path, metadata, jobs_dir, jobs)
         return run_dir
+
+    @staticmethod
+    def _stop_executor(executor) -> None:
+        """Stop native workers promptly so an interrupted run can be resumed safely."""
+        # Python 3.10 has no public ProcessPoolExecutor termination API. Native
+        # workers may be inside long Timeloop calls, so cancelling queued
+        # futures alone would make context-manager shutdown wait for every job.
+        processes = getattr(executor, "_processes", None)
+        if processes:
+            for process in tuple(processes.values()):
+                try:
+                    if os.getpgid(process.pid) == process.pid:
+                        os.killpg(process.pid, signal.SIGTERM)
+                    else:
+                        process.terminate()
+                except ProcessLookupError:
+                    pass
+        executor.shutdown(wait=False, cancel_futures=True)
 
     def _run_job(self, job: ReproductionJob) -> dict[str, object]:
         try:
@@ -379,6 +481,8 @@ class ReproductionRunner:
                 MRRMacroConfig(
                     n_tiles=job.tiles, n_pes=job.pes, n_cols=job.cols, n_rows=job.rows,
                     macro=job.macro, system=self.manifest.raw["system"], max_utilization=False,
+                    front_mrr_slice_bits=job.front_mrr_slice_bits,
+                    frequency_hz=float(self.manifest.raw["frequency_hz"]),
                 ),
             )
             return self._success_payload(job, result)
@@ -413,13 +517,24 @@ class ReproductionRunner:
         return metadata
 
     def _finalize(self, path: Path, metadata: dict, jobs_dir: Path, jobs: Sequence[ReproductionJob]) -> None:
+        self._record_progress(path, metadata, jobs_dir, jobs)
+
+    def _record_progress(
+        self,
+        path: Path,
+        metadata: dict,
+        jobs_dir: Path,
+        jobs: Sequence[ReproductionJob],
+        *,
+        status: Optional[str] = None,
+    ) -> None:
         payloads = [json.loads((jobs_dir / f"{job.job_id}.json").read_text()) for job in jobs if (jobs_dir / f"{job.job_id}.json").exists()]
         succeeded = sum(payload["status"] == "success" for payload in payloads)
         failed = sum(payload["status"] == "failed" for payload in payloads)
         metadata.update({
             "updated_at": _utc_now(), "successful_jobs": succeeded, "failed_jobs": failed,
             "remaining_jobs": len(jobs) - len(payloads),
-            "status": "complete" if succeeded == len(jobs) else "incomplete",
+            "status": status or ("complete" if succeeded == len(jobs) else "incomplete"),
         })
         self._atomic_json(path, metadata)
 
@@ -435,6 +550,7 @@ class ReproductionRunner:
                 "energy_breakdown": result.energy_breakdown,
                 "area_breakdown": result.area_breakdown,
                 "power_breakdown": result.power_breakdown,
+                "mapping_text": result.mapping_text,
             },
         }
 
@@ -629,38 +745,46 @@ class ReproductionValidator:
         return pd.DataFrame(rows)
 
     def _reference_check(self, aggregates: pd.DataFrame) -> dict[str, object]:
-        required = {"network", "variant", "cols", "rows", "energy_j", "latency_s", "edp_j_s"}
+        keys = ["network", "variant", "architecture", "tiles", "pes", "cols", "rows"]
+        metrics = ["energy_j", "latency_s", "edp_j_s"]
+        required = set(keys + metrics)
         if not required.issubset(aggregates.columns):
             return self._check(
                 "committed_reference_metrics", False, "ERROR",
                 f"aggregate columns missing: {sorted(required - set(aggregates.columns))}",
             )
-        reference_dir = self.manifest.repo_root / "examples/rosa/paper_edp_data"
+        path = (
+            self.manifest.repo_root
+            / "examples/rosa/dac26_reference/network_architecture_metrics.csv"
+        )
+        if not path.exists():
+            return self._check(
+                "committed_reference_metrics", False, "ERROR",
+                f"reference fixture missing: {path.relative_to(self.manifest.repo_root)}",
+            )
+        reference = pd.read_csv(path)
+        if not required.issubset(reference.columns):
+            return self._check(
+                "committed_reference_metrics", False, "ERROR",
+                f"reference columns missing: {sorted(required - set(reference.columns))}",
+            )
+        merged = reference[keys + metrics].merge(
+            aggregates[keys + metrics], on=keys, how="outer",
+            suffixes=("_reference", "_actual"), indicator=True,
+        )
+        missing = int((merged["_merge"] != "both").sum())
         relative_errors = []
-        missing = []
-        suffixes = {"no_osa": "", "osa": "_osa"}
-        for network in self.manifest.networks:
-            for variant, suffix in suffixes.items():
-                path = reference_dir / f"aggregated_metrics_{network}_1bit_input{suffix}.csv"
-                if not path.exists():
-                    missing.append(path.name)
-                    continue
-                reference = pd.read_csv(path)
-                actual = aggregates[(aggregates.network == network) & (aggregates.variant == variant)]
-                for row in reference.itertuples(index=False):
-                    selected = actual[(actual.cols == row.Cols) & (actual.rows == row.Rows)]
-                    if len(selected) != 1:
-                        missing.append(f"{network}/{variant}/C{row.Cols}R{row.Rows}")
-                        continue
-                    for actual_col, reference_value in (
-                        ("energy_j", row.Energy), ("latency_s", row.Latency), ("edp_j_s", row.EDP)
-                    ):
-                        value = float(selected.iloc[0][actual_col])
-                        relative_errors.append(abs(value - float(reference_value)) / max(abs(float(reference_value)), 1e-30))
+        matched = merged[merged["_merge"] == "both"]
+        for metric in metrics:
+            expected = matched[f"{metric}_reference"].astype(float)
+            actual = matched[f"{metric}_actual"].astype(float)
+            relative_errors.extend(
+                ((actual - expected).abs() / expected.abs().clip(lower=1e-30)).tolist()
+            )
         maximum = max(relative_errors, default=float("inf"))
         tolerance = float(self.manifest.raw["tolerances"]["reference_relative"])
         passed = not missing and maximum <= tolerance
-        detail = f"max relative error={maximum:.3%}; missing={len(missing)}"
+        detail = f"max relative error={maximum:.3%}; missing={missing}"
         return self._check("committed_reference_metrics", passed, "ERROR", detail)
 
     @staticmethod

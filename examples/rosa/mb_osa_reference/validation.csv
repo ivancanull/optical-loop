@@ -1,0 +1,20 @@
+check,severity,status,detail
+job_coverage,ERROR,PASS,42240/42240
+no_duplicate_jobs,ERROR,PASS,unique=42240
+exact_expected_jobs,ERROR,PASS,"missing=0, unexpected=0"
+no_failed_job_results,ERROR,PASS,"result_files=42240, failed=0"
+supported_slice_widths,ERROR,PASS,"[np.int64(1), np.int64(2), np.int64(4), np.int64(8)]"
+temporal_slice_counts,ERROR,PASS,expected 8/4/2/1
+temporal_accumulation_counts,ERROR,PASS,expected 7/3/1/0
+accuracy_not_modeled,ERROR,PASS,NOT_MODELED
+accumulation_component_selection,ERROR,PASS,"optical=delay_line, digital=digital_shift_add, 8bit=bypass"
+native_mapping_stationarity,ERROR,PASS,WS accumulator traverses X; IS accumulator traverses Y and PE spatial loops only traverse M
+workload_layer_completeness,ERROR,PASS,"{""alexnet"": {""missing"": 0, ""unexpected"": 0}, ""gpt2_medium"": {""missing"": 0, ""unexpected"": 0}, ""mobilenet_v3"": {""missing"": 0, ""unexpected"": 0}, ""resnet18"": {""missing"": 0, ""unexpected"": 0}, ""vgg16"": {""missing"": 0, ""unexpected"": 0}, ""vision_transformer"": {""missing"": 0, ""unexpected"": 0}}"
+architecture_constraints,ERROR,PASS,"invalid_candidates=[], shape_mismatches=0"
+unit_consistency,ERROR,PASS,"positive=True, max_latency_relative=0.000e+00"
+frequency_consistency,ERROR,PASS,"expected_hz=5000000000, max_relative=0.000e+00"
+native_dac_resolution_distinct,ERROR,PASS,strictly_increasing=True
+physical_mrr_area_invariant,ERROR,PASS,max_spread_mm2=0.000e+00
+analog_8bit_bypass_equivalence,ERROR,PASS,"cycles_equal=True, max_energy_relative=0.000e+00"
+edp_formula,ERROR,PASS,max=0.000e+00
+aswm_no_worse_than_fixed,ERROR,PASS,worse=[]

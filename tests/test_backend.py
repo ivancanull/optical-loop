@@ -33,9 +33,9 @@ def test_backend_run_layer_forwards_timeloop_kwargs() -> None:
         n_pes=2,
         n_cols=3,
         n_rows=4,
-        macro="proposed_mrr",
+        macro="mrr_ws_no_osa",
         system="fetch_all_lpddr4",
-        voltage_dac_resolution=2,
+        front_mrr_slice_bits=2,
         max_utilization=True,
     )
 
@@ -43,7 +43,7 @@ def test_backend_run_layer_forwards_timeloop_kwargs() -> None:
 
     assert calls == [
         {
-            "macro": "proposed_mrr",
+            "macro": "mrr_ws_no_osa",
             "layer": "toy/0",
             "variables": {
                 "SCALING": '"aggressive"',
@@ -51,7 +51,10 @@ def test_backend_run_layer_forwards_timeloop_kwargs() -> None:
                 "N_PES": 2,
                 "N_COLUMNS": 3,
                 "N_ROWS": 4,
-                "VOLTAGE_DAC_RESOLUTION": 2,
+                    "FRONT_MRR_SLICE_BITS": 2,
+                    "FRONT_MRR_RADIX": 4,
+                    "N_TEMPORAL_SLICES": 4,
+                    "N_TEMPORAL_ACCUMULATIONS": 3,
             },
             "system": "fetch_all_lpddr4",
             "max_utilization": True,
@@ -75,9 +78,9 @@ def test_backend_run_batch_forwards_only_timeloop_kwargs() -> None:
         n_pes=2,
         n_cols=3,
         n_rows=4,
-        macro="proposed_mrr",
+        macro="mrr_ws_no_osa",
         system="fetch_all_lpddr4",
-        voltage_dac_resolution=2,
+        front_mrr_slice_bits=2,
         max_utilization=False,
     )
     runs = [
@@ -92,7 +95,7 @@ def test_backend_run_batch_forwards_only_timeloop_kwargs() -> None:
 
     assert calls == [
         {
-            "macro": "proposed_mrr",
+            "macro": "mrr_ws_no_osa",
             "layer": "toy/0",
             "variables": {
                 "SCALING": '"aggressive"',
@@ -100,7 +103,10 @@ def test_backend_run_batch_forwards_only_timeloop_kwargs() -> None:
                 "N_PES": 2,
                 "N_COLUMNS": 3,
                 "N_ROWS": 4,
-                "VOLTAGE_DAC_RESOLUTION": 2,
+                    "FRONT_MRR_SLICE_BITS": 2,
+                    "FRONT_MRR_RADIX": 4,
+                    "N_TEMPORAL_SLICES": 4,
+                    "N_TEMPORAL_ACCUMULATIONS": 3,
             },
             "system": "fetch_all_lpddr4",
             "max_utilization": False,

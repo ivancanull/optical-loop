@@ -1,0 +1,11 @@
+check,severity,status,detail
+job_coverage,ERROR,PASS,7040/7040 successful jobs
+no_duplicate_jobs,ERROR,PASS,7040 unique
+edp_equals_energy_times_latency,ERROR,PASS,max relative error=0.000e+00
+committed_reference_metrics,ERROR,PASS,max relative error=0.000%; missing=0
+feasible_winner,ERROR,PASS,paper_optimum_8x8
+paper:optimized_vs_compact_reduction,WARNING,WARN,"actual=31.9075%, paper=26.0000%, delta=5.91%"
+paper:optimized_vs_deap_reduction,WARNING,WARN,"actual=44.9246%, paper=64.0000%, delta=19.08%"
+paper:osa_reduction,WARNING,WARN,"actual=22.9265%, paper=29.0000%, delta=6.07%"
+paper:optimized_ode,WARNING,WARN,raw ODE configuration/data unavailable
+paper:hybrid_edp,WARNING,WARN,paper table values are supplied without a complete accuracy-independent hybrid experiment definition

@@ -63,9 +63,9 @@ class MRRMacroConfig:
     n_pes: int
     n_rows: int
     n_cols: int
-    macro: str = "proposed_mrr_optical_shift_add"
+    macro: str = "mrr_ws_osa"
     system: str = "fetch_all_lpddr4"
-    voltage_dac_resolution: int = 1
+    front_mrr_slice_bits: int = 1
     scaling: str = '"aggressive"'
     max_utilization: bool = True
     frequency_hz: Optional[float] = None
@@ -80,7 +80,8 @@ class MRRMacroConfig:
             raise ValueError("macro cannot be empty")
         if not self.system:
             raise ValueError("system cannot be empty")
-        _require_positive_int("voltage_dac_resolution", self.voltage_dac_resolution)
+        if self.front_mrr_slice_bits not in {1, 2, 4, 8}:
+            raise ValueError("front_mrr_slice_bits must be one of 1, 2, 4, or 8")
         if not self.scaling:
             raise ValueError("scaling cannot be empty")
         if self.frequency_hz is not None:
@@ -97,11 +98,17 @@ class MRRMacroConfig:
         return f"T{self.n_tiles}, P{self.n_pes}, C{self.n_cols}, R{self.n_rows}"
 
     def to_timeloop_variables(self) -> dict:
-        return {
+        variables = {
             "SCALING": self.scaling,
             "N_TILES": self.n_tiles,
             "N_PES": self.n_pes,
             "N_COLUMNS": self.n_cols,
             "N_ROWS": self.n_rows,
-            "VOLTAGE_DAC_RESOLUTION": self.voltage_dac_resolution,
+            "FRONT_MRR_SLICE_BITS": self.front_mrr_slice_bits,
+            "FRONT_MRR_RADIX": 2 ** self.front_mrr_slice_bits,
+            "N_TEMPORAL_SLICES": 8 // self.front_mrr_slice_bits,
+            "N_TEMPORAL_ACCUMULATIONS": 8 // self.front_mrr_slice_bits - 1,
         }
+        if self.frequency_hz is not None:
+            variables["GLOBAL_CYCLE_SECONDS"] = 1.0 / self.frequency_hz
+        return variables

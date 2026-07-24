@@ -1,13 +1,18 @@
-name: DAC26 reproduction smoke
+name: OpticalLoop lightweight CI
 
 on:
   push:
+    branches: [main]
   pull_request:
 
+concurrency:
+  group: opticalloop-ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  smoke:
+  test:
     runs-on: ubuntu-22.04
-    timeout-minutes: 120
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
       - uses: docker/setup-buildx-action@v4
@@ -25,7 +30,11 @@ jobs:
           cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
       - name: Unit tests
         run: docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp/opticalloop-home -v "$PWD:/work/optical-loop" -w /work/optical-loop opticalloop-dac26:local python3 -m pytest -q
-      - name: Native mapper smoke and notebook
-        run: docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp/opticalloop-home -v "$PWD:/work/optical-loop" -w /work/optical-loop opticalloop-dac26:local python3 optical_loop.py reproduce smoke --workers 2
+      - name: Environment and manifest doctors
+        run: |
+          docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp/opticalloop-home -v "$PWD:/work/optical-loop" -w /work/optical-loop opticalloop-dac26:local python3 optical_loop.py reproduce doctor
+          docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp/opticalloop-home -v "$PWD:/work/optical-loop" -w /work/optical-loop opticalloop-dac26:local python3 optical_loop.py multislice doctor
+      - name: One native mapper integration job
+        run: docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp/opticalloop-home -v "$PWD:/work/optical-loop" -w /work/optical-loop opticalloop-dac26:local python3 optical_loop.py layer --arch mrr_ws_osa --workload alexnet/0 --tiles 1 --pes 16 --cols 8 --rows 8 --front-mrr-slice-bits 1 --show-mapping
       - name: Rotate build cache
         run: rm -rf /tmp/.buildx-cache && mv /tmp/.buildx-cache-new /tmp/.buildx-cache

@@ -6,7 +6,7 @@ These rules define how OpticalLoop should evolve. They keep the repository focus
 
 - Use object-oriented structure for project-level components.
 - Prefer clear classes with single responsibilities and simple composition.
-- For simple features, do not design for future requirements that are not implemented.
+- For simple features, design only for implemented requirements.
 
 ## Coding Principles
 

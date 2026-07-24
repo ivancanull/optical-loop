@@ -1,0 +1,171 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1600" viewBox="0 0 1800 1600"
+  role="img" aria-labelledby="title desc">
+  <title id="title">OpticalLoop workload-aware evaluation flow</title>
+  <desc id="desc">
+    OpticalLoop accepts workload, architecture, mapping, schedule, precision, and design inputs.
+    Its system-performance path evaluates scheduled component actions with OpticalLoop models,
+    Timeloop, and Accelergy, while the optional noise-aware accuracy path evaluates mapping policies
+    and MRR variations. Both paths feed a joint EDP-accuracy design policy.
+  </desc>
+
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="5"
+      orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#111111"/>
+    </marker>
+    <style>
+      text {
+        font-family: Arial, Helvetica, sans-serif;
+        fill: #111111;
+      }
+      .title { font-weight: 700; letter-spacing: 0.3px; }
+      .label { font-weight: 600; }
+      .body { font-weight: 400; }
+      .outline { stroke: #111111; stroke-width: 4; }
+      .line { stroke: #111111; stroke-width: 4; fill: none; }
+      .arrow { stroke: #111111; stroke-width: 4; fill: none; marker-end: url(#arrow); }
+    </style>
+  </defs>
+
+  <rect width="1800" height="1600" fill="#F3EAD8"/>
+
+  <!-- Header -->
+  <text x="120" y="88" font-size="58" class="title">OpticalLoop</text>
+  <text x="122" y="130" font-size="23" class="label">
+    WORKLOAD-AWARE OPTICAL COMPUTING EVALUATION
+  </text>
+  <line x1="120" y1="166" x2="1680" y2="166" class="line"/>
+
+  <!-- Legend -->
+  <rect x="950" y="80" width="26" height="26" fill="#1B6CA8" class="outline"/>
+  <text x="992" y="101" font-size="20" class="label">System Performance</text>
+  <rect x="1225" y="80" width="26" height="26" fill="#D94A3A" class="outline"/>
+  <text x="1267" y="101" font-size="20" class="label">Noise-Aware Accuracy</text>
+  <rect x="1515" y="80" width="26" height="26" fill="#F2C230" class="outline"/>
+  <text x="1557" y="101" font-size="20" class="label">Joint Policy</text>
+
+  <!-- Design inputs -->
+  <rect x="350" y="225" width="1100" height="120" fill="#FFFFFF" class="outline"/>
+  <rect x="350" y="225" width="30" height="120" fill="#111111"/>
+  <text x="425" y="272" font-size="29" class="title">DESIGN INPUTS</text>
+  <text x="425" y="312" font-size="22" class="body">
+    Workload · Architecture · Mapping · Schedule · Precision · Design Variables
+  </text>
+
+  <!-- Branch -->
+  <path d="M900 345 V405" class="line"/>
+  <path d="M480 405 H1320" class="line"/>
+  <path d="M480 405 V465" class="arrow"/>
+  <path d="M1320 405 V465" class="arrow"/>
+
+  <!-- LEFT PATH FRAME -->
+  <rect x="120" y="485" width="720" height="770" fill="#FFFFFF"/>
+  <line x1="120" y1="485" x2="840" y2="485" class="line"/>
+  <line x1="120" y1="485" x2="120" y2="1255" class="line"/>
+  <line x1="840" y1="485" x2="840" y2="1255" class="line"/>
+  <line x1="120" y1="1255" x2="462" y2="1255" class="line"/>
+  <line x1="498" y1="1255" x2="840" y2="1255" class="line"/>
+
+  <rect x="120" y="485" width="720" height="80" fill="#1B6CA8" class="outline"/>
+  <text x="165" y="536" font-size="30" class="title" fill="#FFFFFF">
+    SYSTEM PERFORMANCE PATH
+  </text>
+
+  <!-- Vertically centered left chain -->
+  <rect x="200" y="650.0" width="560" height="76" fill="#F8F5EE" class="outline"/>
+  <rect x="200" y="650.0" width="18" height="76" fill="#1B6CA8"/>
+  <text x="480.0" y="697.0" text-anchor="middle" font-size="22" class="label">
+    Device, Macro, and System Definition
+  </text>
+
+  <path d="M480.0 726.0 V798.0" class="arrow"/>
+
+  <rect x="200" y="798.0" width="560" height="76" fill="#F8F5EE" class="outline"/>
+  <rect x="200" y="798.0" width="18" height="76" fill="#1B6CA8"/>
+  <text x="480.0" y="845.0" text-anchor="middle" font-size="22" class="label">
+    OpticalLoop Models · Timeloop + Accelergy
+  </text>
+
+  <path d="M480.0 874.0 V946.0" class="arrow"/>
+
+  <rect x="200" y="946.0" width="560" height="76" fill="#F8F5EE" class="outline"/>
+  <rect x="200" y="946.0" width="18" height="76" fill="#1B6CA8"/>
+  <text x="480.0" y="993.0" text-anchor="middle" font-size="22" class="label">
+    Cycles · Data Movement
+  </text>
+
+  <path d="M480.0 1022.0 V1094.0" class="arrow"/>
+
+  <rect x="200" y="1094.0" width="560" height="76" fill="#F8F5EE" class="outline"/>
+  <rect x="200" y="1094.0" width="18" height="76" fill="#1B6CA8"/>
+  <text x="480.0" y="1141.0" text-anchor="middle" font-size="22" class="label">
+    Energy · Latency · EDP
+  </text>
+
+  <path d="M480.0 1170.0 V1280" class="line"/>
+
+  <!-- RIGHT PATH FRAME -->
+  <rect x="960" y="485" width="720" height="770" fill="#FFFFFF"/>
+  <line x1="960" y1="485" x2="1680" y2="485" class="line"/>
+  <line x1="960" y1="485" x2="960" y2="1255" class="line"/>
+  <line x1="1680" y1="485" x2="1680" y2="1255" class="line"/>
+  <line x1="960" y1="1255" x2="1302" y2="1255" class="line"/>
+  <line x1="1338" y1="1255" x2="1680" y2="1255" class="line"/>
+
+  <rect x="960" y="485" width="720" height="80" fill="#D94A3A" class="outline"/>
+  <text x="1005" y="536" font-size="30" class="title" fill="#FFFFFF">
+    NOISE-AWARE ACCURACY PATH
+  </text>
+  <rect x="1515" y="504" width="120" height="42" fill="#FFFFFF" class="outline"/>
+  <text x="1575" y="532" text-anchor="middle" font-size="20" class="label">OPTIONAL</text>
+
+  <rect x="1015" y="610" width="255" height="88" fill="#F8F5EE" class="outline"/>
+  <rect x="1015" y="610" width="18" height="88" fill="#D94A3A"/>
+  <text x="1142.5" y="645" text-anchor="middle" font-size="22" class="label">Mapping Policy</text>
+  <text x="1142.5" y="675" text-anchor="middle" font-size="20" class="body">WS · IS · Hybrid</text>
+
+  <rect x="1370" y="610" width="255" height="88" fill="#F8F5EE" class="outline"/>
+  <rect x="1370" y="610" width="18" height="88" fill="#D94A3A"/>
+  <text x="1497.5" y="645" text-anchor="middle" font-size="22" class="label">MRR Variations</text>
+  <text x="1497.5" y="675" text-anchor="middle" font-size="20" class="body">Thermal · DAC</text>
+
+  <path d="M1142.5 698 V745 H1320" class="line"/>
+  <path d="M1497.5 698 V745 H1320" class="line"/>
+  <path d="M1320 745 V820" class="arrow"/>
+
+  <rect x="1040" y="820" width="560" height="76" fill="#F8F5EE" class="outline"/>
+  <rect x="1040" y="820" width="18" height="76" fill="#D94A3A"/>
+  <text x="1320.0" y="867" text-anchor="middle" font-size="24" class="label">
+    Whole-Network Inference
+  </text>
+
+  <path d="M1320.0 896 V966" class="arrow"/>
+
+  <rect x="1040" y="966" width="560" height="76" fill="#F8F5EE" class="outline"/>
+  <rect x="1040" y="966" width="18" height="76" fill="#D94A3A"/>
+  <text x="1320.0" y="1013" text-anchor="middle" font-size="24" class="label">
+    Accuracy · Degradation
+  </text>
+
+  <path d="M1320.0 1042 V1112" class="arrow"/>
+
+  <rect x="1040" y="1112" width="560" height="76" fill="#F8F5EE" class="outline"/>
+  <rect x="1040" y="1112" width="18" height="76" fill="#D94A3A"/>
+  <text x="1320.0" y="1159" text-anchor="middle" font-size="24" class="label">
+    Whole-Network Accuracy
+  </text>
+
+  <path d="M1320.0 1188 V1280" class="line"/>
+
+  <!-- Lower merge -->
+  <path d="M480 1280 V1320 H900" class="line"/>
+  <path d="M1320 1280 V1320 H900" class="line"/>
+  <path d="M900 1320 V1390" class="arrow"/>
+
+  <!-- Joint policy -->
+  <rect x="420" y="1405" width="960" height="78" fill="#F2C230" class="outline"/>
+  <text x="900" y="1438" text-anchor="middle" font-size="26" class="title">JOINT DESIGN POLICY</text>
+  <text x="900" y="1466" text-anchor="middle" font-size="20" class="label">
+    Constrained or Weighted EDP–Accuracy Tradeoff
+  </text>
+</svg>

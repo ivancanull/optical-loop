@@ -1,0 +1,15 @@
+batch_size: 128
+num_workers: 4
+data_dir: data/cifar10
+dataset: cifar10
+
+model:
+  input_channels: 3
+  num_classes: 10
+  model_type: quantized_resnet18
+  weight_bits: 8
+  # The imported checkpoint stores the quantized classifier as classifier.1.
+  # Dropout is disabled in eval mode but recreates that Sequential boundary.
+  dropout: 0.1
+  signed: true
+  hidden_channels: [64, 128, 256, 512]

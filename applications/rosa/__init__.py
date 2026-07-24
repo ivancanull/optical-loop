@@ -1,16 +1,5 @@
-"""ROSA application workflow for OpticalLoop."""
+"""Current ROSA simulation, analysis, and mapping workflows."""
 
-from opticalloop.applications.rosa.validation import (
-    FINAL_ARTIFACTS,
-    RosaResultValidator,
-    ValidationCheck,
-    write_reference_artifacts,
-)
-from opticalloop.applications.rosa.paper_edp import (
-    PAPER_NETWORKS,
-    PaperEDPConfig,
-    PaperEDPReproduction,
-)
 from opticalloop.applications.rosa.reproduction import (
     EnvironmentDoctor,
     ExperimentManifest,
@@ -18,34 +7,37 @@ from opticalloop.applications.rosa.reproduction import (
     ReproductionRunner,
     ReproductionValidator,
 )
-from opticalloop.applications.rosa.workflow import (
-    ArchitectureSetting,
-    HybridMappingSpec,
-    MacroVariant,
-    RosaWorkflow,
-    RosaWorkflowSpec,
-    default_rosa_workflow,
-    parse_architecture_argument,
+from opticalloop.applications.rosa.multislice import (
+    ACCURACY_STATUS,
+    ASWMOptimizer,
+    MultiSliceAnalyzer,
+    MultiSliceValidator,
+    ParetoState,
+    SliceChoice,
+    SliceEnergyModel,
+)
+from opticalloop.applications.rosa.online_mapping import (
+    MappingOptimizer,
+    OptimizationConfig,
+    PolicyEvaluator,
+    run_online_mapping,
 )
 
 __all__ = [
-    "ArchitectureSetting",
-    "FINAL_ARTIFACTS",
-    "HybridMappingSpec",
+    "ACCURACY_STATUS",
+    "ASWMOptimizer",
     "EnvironmentDoctor",
     "ExperimentManifest",
-    "MacroVariant",
-    "PAPER_NETWORKS",
-    "PaperEDPConfig",
-    "PaperEDPReproduction",
-    "RosaResultValidator",
-    "RosaWorkflow",
-    "RosaWorkflowSpec",
+    "MappingOptimizer",
+    "MultiSliceAnalyzer",
+    "MultiSliceValidator",
+    "OptimizationConfig",
+    "PolicyEvaluator",
+    "ParetoState",
+    "SliceChoice",
+    "SliceEnergyModel",
     "ReproductionAnalyzer",
     "ReproductionRunner",
     "ReproductionValidator",
-    "ValidationCheck",
-    "default_rosa_workflow",
-    "parse_architecture_argument",
-    "write_reference_artifacts",
+    "run_online_mapping",
 ]
