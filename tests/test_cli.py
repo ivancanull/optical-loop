@@ -180,3 +180,23 @@ def test_make_full_targets_distinguish_complete_and_bounded_runs() -> None:
     assert "--max-jobs" in full_batch
     assert "--max-jobs" not in multislice
     assert "--max-jobs" in multislice_batch
+
+
+def test_actions_run_one_layer_instead_of_research_smoke() -> None:
+    workflow = (
+        Path(__file__).resolve().parents[1]
+        / ".github/workflows/reproduction-smoke.yml"
+    ).read_text()
+
+    assert "reproduce smoke" not in workflow
+    assert "multislice smoke" not in workflow
+    assert "reproduce doctor" in workflow
+    assert "multislice doctor" in workflow
+    assert workflow.count("optical_loop.py layer") == 1
+    assert "branches: [main]" in workflow
+    assert "cancel-in-progress: true" in workflow
+    assert (
+        "optical_loop.py layer --arch mrr_ws_osa --workload alexnet/0 "
+        "--tiles 1 --pes 16 --cols 8 --rows 8 "
+        "--front-mrr-slice-bits 1 --show-mapping"
+    ) in workflow
